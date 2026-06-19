@@ -1,0 +1,3260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SchoolPro Manager — Uganda v4.0</title>
+<script>
+(function(){
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#0f1f4b"/><rect x="60" y="60" width="392" height="392" rx="70" fill="#1a3270"/><text x="256" y="310" font-size="220" text-anchor="middle" font-family="serif" fill="#c9952a">S</text><rect x="80" y="380" width="352" height="30" rx="8" fill="#c9952a" opacity="0.7"/></svg>`;
+  const svgUrl='data:image/svg+xml,'+encodeURIComponent(svg);
+  const manifest={name:'SchoolPro Manager',short_name:'SchoolPro',description:'Uganda school marks & report card manager',start_url:location.href,display:'standalone',orientation:'portrait-primary',background_color:'#0f1f4b',theme_color:'#0f1f4b',icons:[{src:svgUrl,sizes:'192x192',type:'image/svg+xml',purpose:'any maskable'},{src:svgUrl,sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
+  const manifestBlob=new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'});
+  const mLink=document.createElement('link');mLink.rel='manifest';mLink.href=URL.createObjectURL(manifestBlob);
+  document.currentScript.parentNode.appendChild(mLink);
+  const aLink=document.createElement('link');aLink.rel='apple-touch-icon';aLink.href=svgUrl;
+  document.currentScript.parentNode.appendChild(aLink);
+  if('serviceWorker' in navigator){
+    const swCode=`const CACHE_NAME='schoolpro-v4-0';const CORE=[self.location.href];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(CORE)));self.skipWaiting();});self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))));self.clients.claim();});self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(caches.match(e.request).then(cached=>{if(cached)return cached;return fetch(e.request).then(r=>{if(!r||r.status!==200||r.type==='opaque')return r;caches.open(CACHE_NAME).then(c=>c.put(e.request,r.clone()));return r;}).catch(()=>cached);}));});`;
+    const swBlob=new Blob([swCode],{type:'text/javascript'});
+    navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
+  }
+})();
+</script>
+<meta name="theme-color" content="#0f1f4b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SchoolPro">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --navy:#0f1f4b;--navy-mid:#1a3270;--gold:#c9952a;--gold-light:#f0c96a;
+  --soft:#f4f7ff;--border:#dde3f0;--red:#b22222;--green:#2e7d32;
+  --text:#1a1a2e;--muted:#6b7497;--white:#ffffff;
+  --shadow:0 4px 24px rgba(15,31,75,0.10);--shadow-lg:0 8px 40px rgba(15,31,75,0.16);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--soft);color:var(--text);min-height:100vh;}
+header{background:var(--navy);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:64px;box-shadow:0 2px 20px rgba(15,31,75,0.25);position:sticky;top:0;z-index:100;}
+.header-brand{display:flex;align-items:center;gap:10px;}
+.header-icon{width:34px;height:34px;background:var(--gold);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.header-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--white);}
+.header-title span{color:var(--gold-light);}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.header-tabs{display:flex;gap:3px;background:rgba(255,255,255,0.07);padding:3px;border-radius:9px;}
+.tab-btn{padding:7px 16px;border:none;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;background:transparent;color:rgba(255,255,255,0.6);}
+.tab-btn.active,.tab-btn:hover{background:var(--gold);color:var(--navy);font-weight:600;}
+#logoutBtn{display:none;padding:6px 14px;border:1.5px solid rgba(255,255,255,0.25);border-radius:7px;background:transparent;color:rgba(255,255,255,0.7);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;transition:all 0.2s;}
+#logoutBtn:hover{background:rgba(255,255,255,0.1);color:#fff;}
+.container{max-width:1280px;margin:0 auto;padding:28px 20px;}
+.page{display:none;animation:fadeUp 0.3s ease;}
+.page.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+#dbOverlay{position:fixed;inset:0;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:14px;}
+#dbOverlay .spin{width:44px;height:44px;border:4px solid rgba(255,255,255,0.2);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;}
+#dbOverlay p{color:rgba(255,255,255,0.8);font-size:14px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.card{background:var(--white);border-radius:16px;padding:24px 28px;margin-bottom:20px;box-shadow:var(--shadow);border:1px solid var(--border);}
+.card-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--navy);margin-bottom:18px;display:flex;align-items:center;gap:9px;}
+.card-title::before{content:'';display:inline-block;width:4px;height:20px;background:var(--gold);border-radius:2px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.form-group{margin-bottom:14px;}
+label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:5px;}
+input[type=text],input[type=password],input[type=number],select,textarea{width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:9px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);background:var(--soft);transition:border 0.2s,box-shadow 0.2s;outline:none;}
+textarea{resize:vertical;min-height:68px;}
+input:focus,select:focus,textarea:focus{border-color:var(--navy-mid);box-shadow:0 0 0 3px rgba(26,50,112,0.10);background:var(--white);}
+input[type=file]{width:100%;padding:8px 13px;border:1.5px dashed var(--border);border-radius:9px;font-size:13px;color:var(--muted);background:var(--soft);cursor:pointer;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.18s;}
+.btn-primary{background:var(--navy);color:var(--white);}
+.btn-primary:hover{background:var(--navy-mid);transform:translateY(-1px);box-shadow:0 4px 14px rgba(15,31,75,0.22);}
+.btn-gold{background:var(--gold);color:var(--navy);}
+.btn-gold:hover{background:var(--gold-light);transform:translateY(-1px);}
+.btn-danger{background:#fee2e2;color:var(--red);}
+.btn-danger:hover{background:#fecaca;}
+.btn-outline{background:transparent;color:var(--navy);border:1.5px solid var(--border);}
+.btn-outline:hover{border-color:var(--navy);background:var(--soft);}
+.btn-green{background:#dcfce7;color:#166534;}
+.btn-green:hover{background:#bbf7d0;}
+.btn-sm{padding:6px 13px;font-size:12px;border-radius:7px;}
+.btn-xs{padding:4px 9px;font-size:11px;border-radius:6px;}
+.alert{padding:11px 15px;border-radius:9px;font-size:13px;margin-top:10px;display:none;}
+.alert.show{display:flex;align-items:center;gap:7px;}
+.alert-success{background:#f0fdf4;color:var(--green);border:1px solid #bbf7d0;}
+.alert-error{background:#fef2f2;color:var(--red);border:1px solid #fecaca;}
+.alert-info{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;}
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;}
+.badge-navy{background:var(--navy);color:white;}
+.badge-a{background:#dcfce7;color:#166534;}
+.badge-b{background:#dbeafe;color:#1e40af;}
+.badge-c{background:#fef9c3;color:#854d0e;}
+.badge-d{background:#ffedd5;color:#9a3412;}
+.badge-e{background:#fee2e2;color:#991b1b;}
+.login-card{max-width:420px;margin:50px auto;}
+.login-icon{width:60px;height:60px;background:linear-gradient(135deg,var(--navy),var(--navy-mid));border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 18px;box-shadow:0 8px 24px rgba(15,31,75,0.22);}
+.login-card h2{font-family:'Playfair Display',serif;font-size:22px;text-align:center;margin-bottom:5px;}
+.login-card p{text-align:center;color:var(--muted);font-size:13px;margin-bottom:22px;}
+.table-wrap{overflow-x:auto;border-radius:11px;border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead{background:var(--navy);}
+th{color:var(--white);font-weight:600;padding:12px 13px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;}
+td{padding:10px 13px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#f9fafb;}
+.empty-row td{text-align:center;padding:36px;color:var(--muted);font-size:13px;}
+#classTable input[type=number]{width:58px;padding:5px 7px;text-align:center;font-size:13px;margin:0;}
+.stat-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+.stat-card{background:var(--white);border:1px solid var(--border);border-radius:13px;padding:18px 20px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);}
+.stat-icon{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+.stat-icon.blue{background:#e8effe;}.stat-icon.gold{background:#fef9ec;}.stat-icon.green{background:#f0fdf4;}.stat-icon.purple{background:#f3e8ff;}.stat-icon.red{background:#fef2f2;}.stat-icon.teal{background:#f0fdfa;}
+.stat-val{font-family:'Playfair Display',serif;font-size:24px;font-weight:700;color:var(--navy);}
+.stat-lbl{font-size:11px;color:var(--muted);font-weight:500;margin-top:1px;}
+.search-bar{display:flex;gap:8px;margin-bottom:13px;align-items:center;flex-wrap:wrap;}
+.search-bar input{max-width:240px;margin:0;}
+.search-bar select{max-width:170px;margin:0;}
+.pagination{display:flex;align-items:center;gap:7px;margin-top:13px;flex-wrap:wrap;}
+.pagination button{padding:5px 13px;border:1.5px solid var(--border);border-radius:7px;background:var(--white);color:var(--navy);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:'DM Sans',sans-serif;}
+.pagination button:hover{border-color:var(--navy);background:var(--soft);}
+.pagination button.active{background:var(--navy);color:var(--white);border-color:var(--navy);}
+.pagination button:disabled{opacity:0.35;cursor:not-allowed;}
+.pagination .page-info{font-size:12px;color:var(--muted);}
+.grade-key{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;}
+.grade-key-item{display:flex;align-items:center;gap:5px;background:var(--soft);border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-size:12px;}
+.grade-key-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.photo-preview-wrap{margin-top:9px;display:none;align-items:center;gap:11px;}
+.info-note{background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;padding:11px 15px;font-size:13px;color:#1e40af;margin-bottom:14px;}
+.warn-note{background:#fffbeb;border:1px solid #fde68a;border-radius:9px;padding:11px 15px;font-size:13px;color:#92400e;margin-bottom:14px;}
+/* TERM PILLS */
+.term-pill-wrap{display:flex;gap:5px;flex-wrap:wrap;}
+.term-pill{padding:6px 15px;border:1.5px solid var(--border);border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:var(--soft);color:var(--muted);transition:all 0.15s;}
+.term-pill.active{background:var(--navy);color:white;border-color:var(--navy);}
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,31,75,0.55);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--white);border-radius:18px;padding:28px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);}
+.modal-title{font-family:'Playfair Display',serif;font-size:19px;color:var(--navy);margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;}
+.modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1;}
+/* TABS inside admin */
+.admin-tabs{display:flex;gap:3px;background:var(--soft);padding:4px;border-radius:10px;margin-bottom:20px;flex-wrap:wrap;}
+.admin-tab{padding:8px 16px;border:none;border-radius:7px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:var(--muted);transition:all 0.2s;}
+.admin-tab.active{background:var(--white);color:var(--navy);font-weight:700;box-shadow:var(--shadow);}
+.admin-section{display:none;}
+.admin-section.active{display:block;}
+/* CHARTS */
+.chart-bar-wrap{display:flex;flex-direction:column;gap:7px;}
+.chart-bar-row{display:flex;align-items:center;gap:10px;font-size:12px;}
+.chart-bar-label{min-width:100px;color:var(--navy);font-weight:600;}
+.chart-bar-track{flex:1;background:var(--border);border-radius:20px;height:18px;overflow:hidden;}
+.chart-bar-fill{height:100%;border-radius:20px;transition:width 0.7s ease;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:700;color:white;}
+.chart-bar-count{min-width:28px;text-align:right;color:var(--muted);font-weight:600;}
+/* LAST SAVED */
+.last-saved{font-size:11px;color:var(--muted);margin-top:6px;font-style:italic;}
+/* TEACHER CARD in list */
+.teacher-card{background:var(--soft);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;}
+.teacher-info{flex:1;}
+.teacher-name{font-weight:700;color:var(--navy);font-size:14px;}
+.teacher-meta{font-size:12px;color:var(--muted);margin-top:2px;}
+/* CONDUCT GRID */
+.conduct-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+/* A4 REPORT CARD */
+.a4-preview-wrap{display:flex;justify-content:center;margin-top:24px;}
+.a4-page{
+  width:210mm;min-height:297mm;background:#fff;border:1px solid #ccc;
+  box-shadow:0 8px 40px rgba(15,31,75,0.18);border-radius:4px;
+  padding:9mm 13mm 7mm;position:relative;overflow:hidden;
+  font-size:10pt;font-family:'DM Sans',sans-serif;color:#111;
+  display:flex;flex-direction:column;
+}
+.rc-watermark{position:absolute;top:36%;left:14%;font-family:'Playfair Display',serif;font-size:68pt;font-weight:800;color:rgba(15,31,75,0.03);transform:rotate(-22deg);pointer-events:none;user-select:none;letter-spacing:6px;white-space:nowrap;}
+.rc-topbar{height:7px;background:linear-gradient(90deg,var(--navy) 0%,var(--gold) 50%,var(--navy) 100%);border-radius:4px;margin-bottom:7px;position:relative;z-index:1;}
+.rc-header{display:flex;align-items:center;gap:13px;margin-bottom:6px;position:relative;z-index:1;}
+.rc-logo{width:72px;height:72px;border-radius:50%;border:3px solid var(--navy);object-fit:cover;flex-shrink:0;background:#f0f4ff;}
+.rc-logo-placeholder{width:72px;height:72px;border-radius:50%;border:3px dashed #aab;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;background:#f0f4ff;}
+.rc-school-block{flex:1;text-align:center;}
+.rc-school-name{font-family:'Playfair Display',serif;font-size:15pt;font-weight:800;color:#8b0000;letter-spacing:0.5px;line-height:1.1;}
+.rc-school-motto{font-size:8.5pt;color:#555;font-style:italic;margin:2px 0;}
+.rc-school-contact{font-size:7.5pt;color:#666;}
+.rc-report-badge{display:inline-block;background:var(--navy);color:#fff;padding:3px 16px;border-radius:20px;font-size:7.5pt;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-top:4px;}
+.rc-passport{width:68px;height:82px;border:2.5px solid var(--navy);border-radius:6px;object-fit:cover;flex-shrink:0;background:#e8effe;}
+.rc-passport-placeholder{width:68px;height:82px;border:2px dashed #aab;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#f0f4ff;flex-direction:column;gap:3px;font-size:19px;color:#999;}
+.rc-divider{border:none;border-top:2px solid var(--navy);margin:4px 0;position:relative;z-index:1;}
+.rc-student-strip{display:flex;gap:0;border:1.5px solid var(--navy);border-radius:7px;overflow:hidden;margin-bottom:6px;position:relative;z-index:1;}
+.rc-sfield{flex:1;padding:5px 7px;border-right:1px solid #dde3f0;font-size:8pt;}
+.rc-sfield:last-child{border-right:none;}
+.rc-sfield-label{font-size:6pt;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.4px;}
+.rc-sfield-value{font-weight:700;color:var(--navy);margin-top:1px;}
+.rc-section-title{font-size:7pt;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--navy);margin:5px 0 3px;position:relative;z-index:1;border-bottom:1px solid var(--border);padding-bottom:2px;}
+.rc-table-wrap{position:relative;z-index:1;}
+.rc-table{width:100%;border-collapse:collapse;font-size:8pt;}
+.rc-table thead tr{background:var(--navy);}
+.rc-table th{color:#fff;font-weight:700;padding:5px 4px;font-size:7pt;text-transform:uppercase;letter-spacing:0.4px;text-align:center;border:0.5px solid rgba(255,255,255,0.2);}
+.rc-table th:first-child{text-align:left;padding-left:7px;}
+.rc-table td{padding:3px 4px;border:0.5px solid #e2e8f0;text-align:center;}
+.rc-table td:first-child{text-align:left;padding-left:7px;font-weight:600;}
+.rc-table tbody tr:nth-child(even) td{background:#f7f9ff;}
+.rc-summary{display:flex;gap:9px;margin-top:6px;position:relative;z-index:1;}
+.rc-avg-box{background:var(--navy);color:#fff;border-radius:8px;padding:7px 12px;text-align:center;flex-shrink:0;min-width:84px;}
+.rc-avg-num{font-family:'Playfair Display',serif;font-size:18pt;font-weight:800;line-height:1;}
+.rc-avg-lbl{font-size:6pt;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;}
+.rc-avg-grade{font-size:13pt;font-weight:800;color:var(--gold-light);margin-top:2px;}
+.rc-comments{flex:1;background:#f4f7ff;border-left:4px solid var(--gold);border-radius:7px;padding:6px 10px;font-size:7.5pt;}
+.rc-comments p{margin-bottom:3px;line-height:1.4;}
+.rc-comments strong{color:var(--navy);}
+.rc-conduct{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:6px;position:relative;z-index:1;}
+.rc-conduct-item{border:1px solid #dde3f0;border-radius:5px;padding:4px 6px;font-size:7pt;}
+.rc-conduct-label{color:var(--muted);font-size:6pt;text-transform:uppercase;letter-spacing:0.4px;font-weight:700;}
+.rc-conduct-val{font-weight:800;color:var(--navy);margin-top:1px;font-size:8pt;}
+.rc-grade-key{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;position:relative;z-index:1;}
+.rc-gk-item{display:flex;align-items:center;gap:3px;font-size:6.5pt;background:#f7f9ff;border:1px solid #e2e8f0;border-radius:4px;padding:2px 6px;}
+.rc-gk-dot{width:7px;height:7px;border-radius:50%;}
+.rc-sigs{display:flex;justify-content:space-between;margin-top:8px;position:relative;z-index:1;}
+.rc-sig{text-align:center;flex:1;}
+.rc-sig-line{border-bottom:1.5px solid var(--navy);margin:0 7px 3px;height:20px;}
+.rc-sig-lbl{font-size:6.5pt;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;}
+.rc-bottombar{height:5px;background:linear-gradient(90deg,var(--gold),var(--navy),var(--gold));border-radius:4px;margin-top:7px;position:relative;z-index:1;}
+.rc-stamp{position:absolute;bottom:24mm;right:13mm;width:58px;height:58px;border-radius:50%;border:3px solid rgba(15,31,75,0.13);display:flex;align-items:center;justify-content:center;font-size:6.5px;color:rgba(15,31,75,0.13);text-align:center;font-weight:700;text-transform:uppercase;letter-spacing:1px;line-height:1.3;transform:rotate(-15deg);pointer-events:none;}
+.rc-nextterm{border:1px solid var(--border);border-radius:6px;padding:5px 9px;font-size:7.5pt;margin-top:5px;position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.rc-nextterm-title{grid-column:1/-1;font-weight:800;color:var(--navy);font-size:7pt;text-transform:uppercase;letter-spacing:0.6px;}
+.rc-nextterm-field label{font-size:6pt;color:var(--muted);font-weight:700;text-transform:uppercase;}
+.rc-nextterm-field span{border-bottom:1px solid #aaa;display:block;min-height:12px;margin-top:1px;font-size:8pt;font-weight:700;color:var(--navy);}
+.hidden{display:none!important;}
+/* PRINT */
+@media print{
+  header,.no-print,.stat-cards,.admin-tabs{display:none!important;}
+  body{background:white;margin:0;padding:0;}
+  .container{padding:0;max-width:100%;}
+  .a4-page{width:210mm;min-height:297mm;height:297mm;border:none;box-shadow:none;border-radius:0;page-break-after:always;padding:7mm 11mm 5mm;}
+  @page{size:A4 portrait;margin:0;}
+  .a4-preview-wrap{margin:0;}
+  body.printing-marksheet #admin-gate,body.printing-marksheet #admin-dashboard,body.printing-marksheet #teacher-gate{display:none!important;}
+  body.printing-marksheet #teacher-sheet{display:block!important;}
+  body.printing-marksheet #teacher-sheet .btn{display:none!important;}
+  body.printing-marksheet #teacher-sheet .grade-key{display:none!important;}
+  body.printing-marksheet .card{box-shadow:none!important;border:1px solid #ccc!important;padding:12px!important;}
+  body.printing-marksheet #classTable input[type=number]{border:none!important;background:transparent!important;font-weight:700;}
+}
+@media(max-width:800px){
+  .grid-2,.grid-3,.grid-4,.stat-cards{grid-template-columns:1fr;}
+  header{padding:10px 14px;flex-wrap:wrap;height:auto;gap:8px;}
+  .container{padding:16px 10px;}
+  .card{padding:18px 14px;}
+  .a4-page{width:100%;min-height:auto;padding:5mm;}
+  .rc-conduct{grid-template-columns:1fr 1fr;}
+  .conduct-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div id="dbOverlay">
+  <div class="spin"></div>
+  <p>Opening database…</p>
+</div>
+
+<!-- EDIT STUDENT MODAL -->
+<div class="modal-overlay" id="editStudentModal">
+  <div class="modal">
+    <div class="modal-title">✏️ Edit Learner <button class="modal-close" onclick="closeModal('editStudentModal')">✕</button></div>
+    <input type="hidden" id="editStudentOrigId">
+    <div class="grid-2">
+      <div class="form-group"><label>Full Name</label><input type="text" id="editStudentName" placeholder="Full name"></div>
+      <div class="form-group"><label>Learner ID</label><input type="text" id="editStudentId" placeholder="e.g. S001"></div>
+    </div>
+    <div class="form-group">
+      <label>Class</label>
+      <select id="editStudentClass" onchange="renderSubjectCombo('editStudentClass','editComboWrap',true)">
+        <option>Loading…</option>
+      </select>
+    </div>
+    <div id="editComboWrap" style="display:none"></div>
+    <div class="form-group">
+      <label>Passport Photo (leave blank to keep current)</label>
+      <input type="file" id="editStudentPhoto" accept="image/*" onchange="previewImage(this,'editPhotoPreview','editPhotoPreviewImg','editPhotoPreviewSize',160,200)">
+      <div id="editPhotoPreview" class="photo-preview-wrap">
+        <img id="editPhotoPreviewImg" style="width:52px;height:64px;border-radius:6px;object-fit:cover;border:2px solid var(--navy)">
+        <div><div id="editPhotoPreviewSize" style="font-size:12px;color:var(--muted)"></div></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:6px">
+      <button class="btn btn-outline" onclick="closeModal('editStudentModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveEditStudent()">💾 Save Changes</button>
+    </div>
+    <div id="editStudentAlert" class="alert"></div>
+  </div>
+</div>
+
+<!-- ADD TEACHER MODAL -->
+<div class="modal-overlay" id="addTeacherModal">
+  <div class="modal">
+    <div class="modal-title">➕ Add Teacher Account <button class="modal-close" onclick="closeModal('addTeacherModal')">✕</button></div>
+    <div class="form-group"><label>Full Name</label><input type="text" id="newTeacherName" placeholder="e.g. Mr. Okello John"></div>
+    <div class="form-group"><label>Username (for login)</label><input type="text" id="newTeacherUsername" placeholder="e.g. okello.john"></div>
+    <div class="form-group"><label>Password</label><input type="password" id="newTeacherPw" placeholder="Min 6 characters"></div>
+    <div class="form-group">
+      <label>Subjects they teach (hold Ctrl/Cmd to pick multiple)</label>
+      <select id="newTeacherSubjects" multiple style="height:110px"></select>
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:6px">
+      <button class="btn btn-outline" onclick="closeModal('addTeacherModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewTeacher()">✅ Create Account</button>
+    </div>
+    <div id="addTeacherAlert" class="alert"></div>
+  </div>
+</div>
+
+<!-- ADD PARENT MODAL -->
+<div class="modal-overlay" id="addParentModal">
+  <div class="modal">
+    <div class="modal-title">➕ Add Parent / Guardian Account <button class="modal-close" onclick="closeModal('addParentModal')">✕</button></div>
+    <div class="form-group"><label>Parent / Guardian Full Name</label><input type="text" id="newParentName" placeholder="e.g. Mrs. Apio Grace"></div>
+    <div class="form-group"><label>Username (for login)</label><input type="text" id="newParentUsername" placeholder="e.g. apio.grace"></div>
+    <div class="form-group"><label>Password</label><input type="password" id="newParentPw" placeholder="Min 6 characters"></div>
+    <div class="form-group">
+      <label>Linked Children — Learner IDs (comma-separated)</label>
+      <input type="text" id="newParentChildIds" placeholder="e.g. S001, S002">
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">Enter one or more Learner IDs separated by commas. The parent will see each linked child's report card.</div>
+    </div>
+    <div id="parentChildPreview" style="margin-top:8px;display:none">
+      <div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:5px">Matched Learners:</div>
+      <div id="parentChildPreviewList"></div>
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="previewParentChildren()">🔍 Preview Children</button>
+      <button class="btn btn-outline" onclick="closeModal('addParentModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewParent()">✅ Create Account</button>
+    </div>
+    <div id="addParentAlert" class="alert"></div>
+  </div>
+</div>
+
+<!-- EDIT PARENT MODAL -->
+<div class="modal-overlay" id="editParentModal">
+  <div class="modal">
+    <div class="modal-title">✏️ Edit Parent Account <button class="modal-close" onclick="closeModal('editParentModal')">✕</button></div>
+    <input type="hidden" id="editParentOrigUsername">
+    <div class="form-group"><label>Full Name</label><input type="text" id="editParentName" placeholder="Full name"></div>
+    <div class="form-group"><label>New Password (leave blank to keep current)</label><input type="password" id="editParentPw" placeholder="Leave blank to keep existing"></div>
+    <div class="form-group">
+      <label>Linked Children — Learner IDs (comma-separated)</label>
+      <input type="text" id="editParentChildIds" placeholder="e.g. S001, S002">
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:6px">
+      <button class="btn btn-outline" onclick="closeModal('editParentModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveEditParent()">💾 Save Changes</button>
+    </div>
+    <div id="editParentAlert" class="alert"></div>
+  </div>
+</div>
+
+<!-- CONDUCT / REMARKS MODAL -->
+<div class="modal-overlay" id="conductModal">
+  <div class="modal">
+    <div class="modal-title">📝 Conduct &amp; Remarks <button class="modal-close" onclick="closeModal('conductModal')">✕</button></div>
+    <input type="hidden" id="conductStudentId">
+    <input type="hidden" id="conductTerm">
+    <div class="grid-2">
+      <div class="form-group"><label>Punctuality</label>
+        <select id="conductPunctuality"><option value="">— Select —</option><option>Excellent</option><option>Very Good</option><option>Good</option><option>Fair</option><option>Poor</option></select>
+      </div>
+      <div class="form-group"><label>Discipline</label>
+        <select id="conductDiscipline"><option value="">— Select —</option><option>Excellent</option><option>Very Good</option><option>Good</option><option>Fair</option><option>Poor</option></select>
+      </div>
+      <div class="form-group"><label>Participation</label>
+        <select id="conductParticipation"><option value="">— Select —</option><option>Excellent</option><option>Very Good</option><option>Good</option><option>Fair</option><option>Poor</option></select>
+      </div>
+      <div class="form-group"><label>Days Present / Total</label>
+        <div style="display:flex;gap:6px">
+          <input type="number" id="conductDaysPresent" placeholder="Present" min="0" max="200" style="width:50%">
+          <input type="number" id="conductDaysTotal" placeholder="Total" min="0" max="200" style="width:50%">
+        </div>
+      </div>
+    </div>
+    <div class="form-group"><label>Class Teacher's Remarks (custom)</label>
+      <textarea id="conductTeacherRemark" placeholder="Write your personal remarks for this learner…" style="min-height:72px"></textarea>
+    </div>
+    <div class="form-group"><label>Headteacher's Remarks (custom)</label>
+      <textarea id="conductHtRemark" placeholder="Headteacher's remarks…" style="min-height:56px"></textarea>
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:6px">
+      <button class="btn btn-outline" onclick="closeModal('conductModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveConductRemarks()">💾 Save</button>
+    </div>
+    <div id="conductAlert" class="alert"></div>
+  </div>
+</div>
+
+<header>
+  <div class="header-brand">
+    <div class="header-icon">📘</div>
+    <div class="header-title">School<span>Pro</span> Manager <span style="font-size:10px;opacity:0.55;font-family:'DM Sans',sans-serif;">v4.0</span></div>
+  </div>
+  <div class="header-right">
+    <div class="header-tabs">
+      <button class="tab-btn active" onclick="switchPage('admin-gate')">🔐 Admin</button>
+      <button class="tab-btn" onclick="switchPage('teacher-gate')">✏️ Teacher</button>
+      <button class="tab-btn" onclick="switchPage('parent-gate')">👨‍👩‍👧 Parent</button>
+    </div>
+    <button id="installBtn" style="display:none;padding:6px 13px;border:1.5px solid var(--gold);border-radius:7px;background:var(--gold);color:var(--navy);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;" onclick="installPWA()">📲 Install</button>
+    <button id="logoutBtn" onclick="logoutAdmin()">↩ Logout</button>
+  </div>
+</header>
+
+<div class="container">
+
+<!-- ══ ADMIN GATE ══ -->
+<div id="admin-gate" class="page active">
+  <div class="card login-card">
+    <div class="login-icon">🔐</div>
+    <h2>Admin Portal</h2>
+    <p>Enter your password to access the school dashboard</p>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="adminPassword" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')loginAdmin()">
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="loginAdmin()">Login to Dashboard →</button>
+    <div id="adminAlert" class="alert"></div>
+    <div id="defaultPwHint" style="background:var(--soft);border:1px solid var(--border);border-radius:7px;padding:9px 13px;font-size:12px;color:var(--muted);margin-top:11px;text-align:center;">
+      First time? Default password: <strong style="color:var(--navy)">admin123</strong> — change it after login.
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADMIN DASHBOARD ══ -->
+<div id="admin-dashboard" class="page hidden">
+  <div class="stat-cards no-print" id="statCards"></div>
+
+  <!-- Admin section tabs -->
+  <div class="admin-tabs no-print">
+    <button class="admin-tab active" onclick="switchAdminTab('tab-school')">🏫 School</button>
+    <button class="admin-tab" onclick="switchAdminTab('tab-teachers')">👩‍🏫 Teachers</button>
+    <button class="admin-tab" onclick="switchAdminTab('tab-students')">👤 Learners</button>
+    <button class="admin-tab" onclick="switchAdminTab('tab-marks')">📊 All Marks</button>
+    <button class="admin-tab" onclick="switchAdminTab('tab-reports')">📄 Report Cards</button>
+    <button class="admin-tab" onclick="switchAdminTab('tab-analytics')">📈 Analytics</button>
+    <button class="admin-tab" onclick="switchAdminTab('tab-transfer')">🔄 Data Transfer</button>
+    <button class="admin-tab" onclick="switchAdminTab('tab-parents')">👨‍👩‍👧 Parents</button>
+    <button class="admin-tab" onclick="switchAdminTab('tab-circulars')">📢 Circulars</button>
+    <button class="admin-tab" onclick="switchAdminTab('tab-settings')">⚙️ Settings</button>
+  </div>
+
+  <!-- TAB: SCHOOL INFO -->
+  <div id="tab-school" class="admin-section active">
+    <div class="card">
+      <div class="card-title">🏫 School Information</div>
+      <div class="grid-2">
+        <div>
+          <div class="form-group"><label>School Name</label><input type="text" id="schoolName" placeholder="e.g. St. Mary's Secondary School"></div>
+          <div class="form-group"><label>School Motto</label><input type="text" id="schoolMotto" placeholder="e.g. Excellence Through Effort"></div>
+          <div class="form-group"><label>Contact / Address</label><input type="text" id="schoolContact" placeholder="Phone / Email / Address"></div>
+        </div>
+        <div>
+          <div class="form-group">
+            <label>School Logo / Badge</label>
+            <input type="file" id="schoolLogo" accept="image/*" onchange="previewImage(this,'logoPreview','logoPreviewImg','logoPreviewSize',200,200)">
+            <div id="logoPreview" class="photo-preview-wrap">
+              <img id="logoPreviewImg" style="width:68px;height:68px;border-radius:50%;object-fit:cover;border:3px solid var(--navy)">
+              <div>
+                <div id="logoPreviewSize" style="font-size:12px;color:var(--muted)"></div>
+                <button type="button" class="btn btn-danger btn-xs" style="margin-top:5px" onclick="removeLogo()">✕ Remove</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-group"><label>Next Term — School Opens Date</label><input type="text" id="nextTermOpens" placeholder="e.g. 6th January 2026"></div>
+          <div class="form-group"><label>Next Term — Fees Due Date</label><input type="text" id="nextTermFees" placeholder="e.g. 10th January 2026"></div>
+          <div class="form-group"><label>Current Academic Year</label><input type="text" id="currentAcademicYear" placeholder="e.g. 2026" style="max-width:160px"></div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="saveSchoolInfo()">💾 Save School Info</button>
+      <div id="schoolAlert" class="alert"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🏛 Class Management</div>
+      <div class="info-note">ℹ️ Add or remove classes. All teacher and learner dropdowns update automatically.</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+        <input type="text" id="newClassName" placeholder="e.g. S.3 North" style="max-width:200px;margin:0">
+        <button class="btn btn-gold" onclick="addClass()">➕ Add Class</button>
+      </div>
+      <div id="classAlert" class="alert"></div>
+      <div id="classManagerList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📚 Subject Management</div>
+      <div class="info-note">ℹ️ Add or remove secondary school subjects (O-Level &amp; A-Level). These appear when assigning subjects to teachers.</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+        <input type="text" id="newSubjectName" placeholder="e.g. Sub-ICT" style="max-width:200px;margin:0">
+        <button class="btn btn-gold" onclick="addSubject()">➕ Add Subject</button>
+      </div>
+      <div id="subjectAlert" class="alert"></div>
+      <div id="subjectManagerList"></div>
+    </div>
+  </div>
+
+  <!-- TAB: TEACHERS -->
+  <div id="tab-teachers" class="admin-section">
+    <div class="card">
+      <div class="card-title">👩‍🏫 Teacher Accounts</div>
+      <div class="info-note">ℹ️ Teachers log in with their username &amp; password. They can only see subjects assigned to them.</div>
+      <button class="btn btn-gold" onclick="openModal('addTeacherModal');document.getElementById('newTeacherName').value='';document.getElementById('newTeacherUsername').value='';document.getElementById('newTeacherPw').value='';" style="margin-bottom:14px">➕ Add Teacher Account</button>
+      <div id="teacherList"></div>
+    </div>
+  </div>
+
+  <!-- TAB: LEARNERS -->
+  <div id="tab-students" class="admin-section">
+    <div class="card">
+      <div class="card-title">👤 Register Learner</div>
+      <div class="grid-3">
+        <div class="form-group"><label>Learner Name</label><input type="text" id="studentName" placeholder="Full name"></div>
+        <div class="form-group"><label>Learner ID</label><input type="text" id="studentId" placeholder="e.g. S001"></div>
+        <div class="form-group">
+          <label>Class</label>
+          <select id="studentClass" onchange="renderSubjectCombo('studentClass','studentComboWrap')">
+            <option>Loading…</option>
+          </select>
+        </div>
+      </div>
+      <div id="studentComboWrap" style="display:none"></div>
+      <div class="form-group">
+        <label>Passport Photo (optional)</label>
+        <input type="file" id="studentPhoto" accept="image/*" onchange="previewImage(this,'photoPreview','photoPreviewImg','photoPreviewSize',160,200)">
+        <div id="photoPreview" class="photo-preview-wrap">
+          <img id="photoPreviewImg" style="width:52px;height:64px;border-radius:6px;object-fit:cover;border:2px solid var(--navy)">
+          <div><div id="photoPreviewSize" style="font-size:12px;color:var(--muted)"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap">
+        <button class="btn btn-gold" onclick="saveStudent()">➕ Register Learner</button>
+        <label class="btn btn-outline" style="cursor:pointer">📥 Bulk Import Excel<input type="file" id="bulkImportFile" accept=".xlsx,.xls" style="display:none" onchange="bulkImportStudents(this)"></label>
+        <button class="btn btn-danger btn-sm" onclick="clearAll()">🗑 Delete All Data</button>
+      </div>
+      <div class="info-note" style="margin-top:12px">💡 <strong>Bulk Import:</strong> Use an Excel file with columns: <em>Learner ID, Full Name, Class</em>. For S.3/S.4 learners, add a <em>Subjects</em> column with exactly 2 electives (comma-separated), e.g. <em>Economics, Computer Studies</em>. Rows missing valid electives will be skipped.</div>
+      <div id="studentAlert" class="alert"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 Registered Learners</div>
+      <div class="search-bar">
+        <input type="text" id="learnerSearch" placeholder="🔍  Search by name or ID…" oninput="learnerPage=1;renderLearnerTable()">
+        <select id="learnerClassFilter" onchange="learnerPage=1;renderLearnerTable()"><option value="">All Classes</option></select>
+      </div>
+      <div class="table-wrap">
+        <table id="learnersTable">
+          <thead><tr><th>#</th><th>Name</th><th>ID</th><th>Class</th><th>Photo</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="learnerPagination"></div>
+    </div>
+  </div>
+
+  <!-- TAB: ALL MARKS -->
+  <div id="tab-marks" class="admin-section">
+    <div class="card">
+      <div class="card-title">📊 All Submitted Marks</div>
+      <div class="info-note">ℹ️ Marks are saved per term. Use filters to narrow. Admin can delete individual mark entries.</div>
+      <div class="search-bar" style="flex-wrap:wrap;gap:7px">
+        <input type="text" id="marksSearch" placeholder="🔍  Search learner or subject…" oninput="marksPage=1;renderAdminMarks()" style="max-width:210px;margin:0">
+        <select id="marksClassFilter" onchange="marksPage=1;renderAdminMarks()" style="max-width:155px;margin:0"><option value="">All Classes</option></select>
+        <select id="marksTermFilter" onchange="marksPage=1;renderAdminMarks()" style="max-width:130px;margin:0">
+          <option value="">All Terms</option><option value="1">Term 1</option><option value="2">Term 2</option><option value="3">Term 3</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table id="adminMarksTable">
+          <thead><tr>
+            <th>Learner</th><th>Class</th><th>Term</th><th>Subject</th>
+            <th>A1/3</th><th>A2/3</th><th>A3/3</th><th>Act/20</th><th>End/80</th>
+            <th>Total</th><th>Grade</th><th>Comment</th><th>Teacher</th><th>Action</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="marksPagination"></div>
+    </div>
+  </div>
+
+  <!-- TAB: REPORT CARDS -->
+  <div id="tab-reports" class="admin-section">
+    <div class="card">
+      <div class="card-title">📄 Generate Report Cards</div>
+      <div class="grid-3" style="align-items:flex-end;margin-bottom:14px">
+        <div class="form-group" style="margin:0">
+          <label>Select Learner</label>
+          <select id="reportStudent"><option>— Register learners first —</option></select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Term</label>
+          <select id="reportTerm"><option value="1">Term 1</option><option value="2">Term 2</option><option value="3">Term 3</option></select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Academic Year</label>
+          <input type="text" id="reportYear" style="margin:0" value="">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        <button class="btn btn-primary" onclick="generateReport()">📋 Generate Single</button>
+        <button class="btn btn-gold" onclick="printAllReportCards()">🖨 Print All (Selected Class)</button>
+        <button class="btn btn-outline" onclick="window.print()">🖨 Print Current</button>
+        <button class="btn btn-outline" id="downloadBtn" onclick="downloadPDF()" style="display:none">⬇️ Download PDF</button>
+        <button class="btn btn-green" id="conductBtn" onclick="openConductModal()" style="display:none">📝 Edit Conduct &amp; Remarks</button>
+      </div>
+      <div class="info-note">💡 To print <strong>all report cards</strong> for a class: select any learner from that class, choose the term, then click <strong>"Print All"</strong>.</div>
+      <div id="reportOutput"></div>
+    </div>
+  </div>
+
+  <!-- TAB: ANALYTICS -->
+  <div id="tab-analytics" class="admin-section">
+    <div class="card">
+      <div class="card-title">📈 Analytics &amp; Insights</div>
+      <div class="grid-2" style="margin-bottom:16px;align-items:flex-end">
+        <div class="form-group" style="margin:0">
+          <label>Filter by Class</label>
+          <select id="analyticsClass" onchange="renderAnalytics()"><option value="">All Classes</option></select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Filter by Term</label>
+          <select id="analyticsTerm" onchange="renderAnalytics()">
+            <option value="">All Terms</option><option value="1">Term 1</option><option value="2">Term 2</option><option value="3">Term 3</option>
+          </select>
+        </div>
+      </div>
+      <div id="analyticsOutput"></div>
+    </div>
+  </div>
+
+  <!-- TAB: DATA TRANSFER -->
+  <div id="tab-transfer" class="admin-section">
+    <div class="card">
+      <div class="card-title">🔄 Data Transfer — Export &amp; Import</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:18px">Export to Excel for backup or to share. Import merges data without overwriting existing records.</p>
+      <div class="grid-2">
+        <div style="background:var(--soft);border:1px solid var(--border);border-radius:13px;padding:18px">
+          <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:5px">📤 Export Data</div>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:13px">Downloads an Excel file with all learners and all marks.</p>
+          <div style="display:flex;gap:7px;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="exportExcel('all')">⬇️ Export All</button>
+            <button class="btn btn-outline btn-sm" onclick="exportExcel('students')">👤 Learners Only</button>
+            <button class="btn btn-outline btn-sm" onclick="exportExcel('marks')">📝 Marks Only</button>
+          </div>
+        </div>
+        <div style="background:var(--soft);border:1px solid var(--border);border-radius:13px;padding:18px">
+          <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:5px">📥 Import Data</div>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:13px">Import an Excel file exported from this system. New records are added; existing ones are kept.</p>
+          <input type="file" id="importFile" accept=".xlsx,.xls" style="margin-bottom:9px">
+          <button class="btn btn-gold" onclick="importExcel()">📥 Import &amp; Merge</button>
+          <div id="importProgress" style="display:none;margin-top:9px">
+            <div style="background:var(--border);border-radius:20px;height:7px;overflow:hidden">
+              <div id="importBar" style="height:100%;background:var(--navy);border-radius:20px;width:0%;transition:width 0.3s"></div>
+            </div>
+            <div id="importStatus" style="font-size:12px;color:var(--muted);margin-top:5px"></div>
+          </div>
+        </div>
+      </div>
+      <div id="transferAlert" class="alert" style="margin-top:13px"></div>
+    </div>
+  </div>
+
+  <!-- TAB: PARENTS -->
+  <div id="tab-parents" class="admin-section">
+    <div class="card">
+      <div class="card-title">👨‍👩‍👧 Parent / Guardian Accounts</div>
+      <div class="info-note">ℹ️ Create login accounts for parents. Each parent is linked to one or more learners by Learner ID. Parents can only see their own child's report cards.</div>
+      <button class="btn btn-gold" onclick="openAddParentModal()" style="margin-bottom:14px">➕ Add Parent Account</button>
+      <div id="parentList"></div>
+    </div>
+  </div>
+
+  <!-- TAB: CIRCULARS -->
+  <div id="tab-circulars" class="admin-section">
+    <div class="card">
+      <div class="card-title">📢 School Circulars</div>
+      <div class="info-note">ℹ️ Upload a circular after each term. Teachers and parents can view and download all published circulars when they log in.</div>
+
+      <!-- Upload form -->
+      <div style="background:var(--soft);border:1px solid var(--border);border-radius:13px;padding:20px;margin-bottom:20px">
+        <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:14px">➕ Publish New Circular</div>
+        <div class="grid-2">
+          <div class="form-group"><label>Circular Title</label><input type="text" id="circularTitle" placeholder="e.g. End of Term 1 Circular — 2025"></div>
+          <div class="form-group"><label>Academic Year</label><input type="text" id="circularYear" placeholder="e.g. 2025" style="max-width:160px"></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Term</label>
+            <select id="circularTerm">
+              <option value="1">Term 1</option>
+              <option value="2">Term 2</option>
+              <option value="3">Term 3</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Circular File (PDF or Image)</label>
+            <input type="file" id="circularFile" accept=".pdf,image/*">
+          </div>
+        </div>
+        <div class="form-group"><label>Additional Notes / Message (optional)</label>
+          <textarea id="circularNotes" placeholder="Any important notes for parents and teachers…"></textarea>
+        </div>
+        <button class="btn btn-gold" onclick="publishCircular()">📤 Publish Circular</button>
+        <div id="circularAlert" class="alert" style="margin-top:10px"></div>
+      </div>
+
+      <!-- Published circulars list -->
+      <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px">📋 Published Circulars</div>
+      <div id="circularAdminList"><div class="warn-note">No circulars published yet.</div></div>
+    </div>
+  </div>
+
+  <!-- TAB: SETTINGS -->
+  <div id="tab-settings" class="admin-section">
+    <div class="card">
+      <div class="card-title">🔑 Change Admin Password</div>
+      <div class="grid-3">
+        <div class="form-group"><label>Current Password</label><input type="password" id="currentPw" placeholder="Enter current"></div>
+        <div class="form-group"><label>New Password</label><input type="password" id="newPw" placeholder="Min 6 characters"></div>
+        <div class="form-group"><label>Confirm New Password</label><input type="password" id="confirmPw" placeholder="Repeat new"></div>
+      </div>
+      <button class="btn btn-primary" onclick="changePassword()">🔒 Update Password</button>
+      <div id="pwAlert" class="alert"></div>
+    </div>
+  </div>
+
+</div><!-- end admin-dashboard -->
+
+<!-- ══ TEACHER GATE ══ -->
+<div id="teacher-gate" class="page hidden">
+  <div class="card login-card">
+    <div class="login-icon">✏️</div>
+    <h2>Teacher Portal</h2>
+    <p>Login with your username and password</p>
+    <div class="form-group"><label>Username</label><input type="text" id="teacherUsername" placeholder="e.g. okello.john" onkeydown="if(event.key==='Enter')teacherLogin()"></div>
+    <div class="form-group"><label>Password</label><input type="password" id="teacherLoginPw" placeholder="Your password" onkeydown="if(event.key==='Enter')teacherLogin()"></div>
+    <button class="btn btn-primary" style="width:100%;margin-bottom:10px" onclick="teacherLogin()">Open My Marksheets →</button>
+    <div id="teacherLoginAlert" class="alert"></div>
+  </div>
+</div>
+
+<!-- ══ TEACHER DASHBOARD ══ -->
+<div id="teacher-dashboard" class="page hidden">
+  <div class="card no-print">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+      <div>
+        <div class="card-title" style="margin:0" id="teacherWelcome">Welcome</div>
+        <div id="teacherSubjectsList" style="color:var(--muted);font-size:13px;margin-top:3px"></div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="switchPage('teacher-gate');currentTeacherObj=null;">↩ Logout</button>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Select a class and term to open your marksheet.</p>
+    <div class="grid-3" style="margin-bottom:14px">
+      <div class="form-group" style="margin:0">
+        <label>Subject</label>
+        <select id="teacherSubjectSelect"></select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Class</label>
+        <select id="classSelect">
+        <option>Loading…</option>
+      </select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Term</label>
+        <div class="term-pill-wrap" id="teacherTermPills">
+          <button class="term-pill active" onclick="selectTermPill(1,this)">Term 1</button>
+          <button class="term-pill" onclick="selectTermPill(2,this)">Term 2</button>
+          <button class="term-pill" onclick="selectTermPill(3,this)">Term 3</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="openMarksheet()">Open Marksheet →</button>
+  </div>
+
+  <!-- Circulars for teachers -->
+  <div class="card no-print" style="margin-top:20px">
+    <div class="card-title">📢 School Circulars</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Latest communications from the school administration.</p>
+    <div id="teacherCircularList"><div class="warn-note">No circulars have been published yet.</div></div>
+  </div>
+</div>
+
+<!-- ══ TEACHER MARKSHEET ══ -->
+<div id="teacher-sheet" class="page hidden">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div>
+        <div class="card-title" style="margin:0" id="sheetTitle">Marksheet</div>
+        <div id="teacherInfo" style="color:var(--muted);font-size:12px;margin-top:3px"></div>
+        <div id="lastSavedLabel" class="last-saved"></div>
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button class="btn btn-gold" onclick="saveMarks()">💾 Save Marks</button>
+        <button class="btn btn-primary" onclick="printMarksheet()">🖨 Print</button>
+        <button class="btn btn-outline" onclick="downloadMarksheet()">⬇️ PDF</button>
+        <button class="btn btn-outline" onclick="exportMarksheetExcel()">📊 Excel</button>
+        <label class="btn btn-outline" style="cursor:pointer;margin:0">📥 Import<input type="file" id="marksheetImportFile" accept=".xlsx,.xls" style="display:none" onchange="importMarksheetExcel(this)"></label>
+        <button class="btn btn-green btn-sm" onclick="openTeacherConductModal()">📝 Conduct</button>
+        <button class="btn btn-outline btn-sm" onclick="backFromMarksheet()">← Back</button>
+      </div>
+    </div>
+    <div id="marksheetTransferAlert" class="alert" style="margin-top:0;margin-bottom:9px"></div>
+    <div class="info-note" style="margin-bottom:13px">📐 <strong>Marking scheme:</strong> 3 Integration Activities (each /3) scaled to <strong>/20</strong>. End of Term exam <strong>/80</strong>. Total = <strong>/100</strong>.</div>
+    <div class="grade-key" style="margin-bottom:13px">
+      <span style="font-size:12px;color:var(--muted);font-weight:600;align-self:center">Grade Key:</span>
+      <span class="grade-key-item"><span class="grade-key-dot" style="background:#16a34a"></span>A — 80–100</span>
+      <span class="grade-key-item"><span class="grade-key-dot" style="background:#1d4ed8"></span>B — 70–79</span>
+      <span class="grade-key-item"><span class="grade-key-dot" style="background:#d97706"></span>C — 55–69</span>
+      <span class="grade-key-item"><span class="grade-key-dot" style="background:#ea580c"></span>D — 45–54</span>
+      <span class="grade-key-item"><span class="grade-key-dot" style="background:#dc2626"></span>E — 0–44</span>
+    </div>
+    <div class="table-wrap">
+      <table id="classTable">
+        <thead>
+          <tr>
+            <th rowspan="2">Learner Name</th>
+            <th colspan="3" style="text-align:center;background:#1a3270">Integration Activities (each /3)</th>
+            <th rowspan="2">Act /20</th>
+            <th rowspan="2">End Term /80</th>
+            <th rowspan="2">Total /100</th>
+            <th rowspan="2">Grade</th>
+            <th rowspan="2">Comment</th>
+          </tr>
+          <tr style="background:#1a3270">
+            <th style="font-size:11px">A1 /3</th>
+            <th style="font-size:11px">A2 /3</th>
+            <th style="font-size:11px">A3 /3</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="marksAlert" class="alert" style="margin-top:11px"></div>
+  </div>
+</div>
+
+<!-- ══ PARENT GATE ══ -->
+<div id="parent-gate" class="page hidden">
+  <div class="card login-card">
+    <div class="login-icon">👨‍👩‍👧</div>
+    <h2>Parent / Guardian Portal</h2>
+    <p>Login with your username and password to view your child's progress</p>
+    <div class="form-group"><label>Username</label><input type="text" id="parentUsername" placeholder="e.g. john.okello" onkeydown="if(event.key==='Enter')parentLogin()"></div>
+    <div class="form-group"><label>Password</label><input type="password" id="parentLoginPw" placeholder="Your password" onkeydown="if(event.key==='Enter')parentLogin()"></div>
+    <button class="btn btn-primary" style="width:100%;margin-bottom:10px" onclick="parentLogin()">View My Child's Report →</button>
+    <div id="parentLoginAlert" class="alert"></div>
+  </div>
+</div>
+
+<!-- ══ PARENT DASHBOARD ══ -->
+<div id="parent-dashboard" class="page hidden">
+  <div class="card no-print" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div class="card-title" style="margin:0" id="parentWelcome">Welcome</div>
+        <div id="parentChildInfo" style="color:var(--muted);font-size:13px;margin-top:3px"></div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="parentLogout()">↩ Logout</button>
+    </div>
+  </div>
+
+  <!-- Term selector -->
+  <div class="card no-print" style="margin-bottom:16px">
+    <div class="card-title">📋 Select Term to View</div>
+    <div class="grid-3" style="align-items:flex-end">
+      <div class="form-group" style="margin:0">
+        <label>Term</label>
+        <div class="term-pill-wrap" id="parentTermPills">
+          <button class="term-pill active" onclick="selectParentTermPill(1,this)">Term 1</button>
+          <button class="term-pill" onclick="selectParentTermPill(2,this)">Term 2</button>
+          <button class="term-pill" onclick="selectParentTermPill(3,this)">Term 3</button>
+        </div>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Academic Year</label>
+        <input type="text" id="parentReportYear" style="margin:0;max-width:140px" placeholder="e.g. 2025">
+      </div>
+      <div>
+        <button class="btn btn-primary" onclick="loadParentReport()">📄 View Report Card</button>
+      </div>
+    </div>
+    <div id="parentReportAlert" class="alert" style="margin-top:10px"></div>
+  </div>
+
+  <!-- Report output -->
+  <div id="parentReportOutput"></div>
+
+  <!-- Download button (shown after generation) -->
+  <div id="parentDownloadWrap" style="display:none;margin-top:10px" class="no-print">
+    <button class="btn btn-outline" onclick="downloadParentPDF()">⬇️ Download PDF</button>
+    <button class="btn btn-outline" onclick="window.print()">🖨️ Print</button>
+  </div>
+
+  <!-- School Circulars for parents -->
+  <div class="card no-print" style="margin-top:20px">
+    <div class="card-title">📢 School Circulars</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Official communications from the school, updated each term.</p>
+    <div id="parentCircularList"><div class="warn-note">No circulars have been published yet.</div></div>
+  </div>
+</div>
+
+</div><!-- container -->
+
+<script type="module">
+'use strict';
+
+/* ════════ FIREBASE ════════ */
+
+/*
+╔══════════════════════════════════════════════════════════════╗
+║            FIRESTORE SECURITY RULES                          ║
+║  Paste these in Firebase Console → Firestore → Rules         ║
+╠══════════════════════════════════════════════════════════════╣
+║                                                              ║
+║  rules_version = '2';                                        ║
+║  service cloud.firestore {                                   ║
+║    match /databases/{database}/documents {                   ║
+║      // School config readable by all, writable only if      ║
+║      // the requester is the admin email                     ║
+║      match /school/{doc} {                                   ║
+║        allow read: if true;                                  ║
+║        allow write: if request.auth != null;                 ║
+║      }                                                       ║
+║      // Students, marks, conduct: any authenticated user     ║
+║      match /students/{id} {                                  ║
+║        allow read, write: if request.auth != null;           ║
+║      }                                                       ║
+║      match /marks/{id} {                                     ║
+║        allow read, write: if request.auth != null;           ║
+║      }                                                       ║
+║      match /conduct/{id} {                                   ║
+║        allow read, write: if request.auth != null;           ║
+║      }                                                       ║
+║      // Teachers readable by auth users, writable by admin   ║
+║      match /teachers/{id} {                                  ║
+║        allow read, write: if request.auth != null;           ║
+║      }                                                       ║
+║      // Parents can only read their own doc                  ║
+║      match /parents/{id} {                                   ║
+║        allow read, write: if request.auth != null;           ║
+║      }                                                       ║
+║      match /classes/{id} {                                   ║
+║        allow read, write: if request.auth != null;           ║
+║      }                                                       ║
+║      match /subjects/{id} {                                  ║
+║        allow read, write: if request.auth != null;           ║
+║      }                                                       ║
+║      match /circulars/{id} {                                 ║
+║        allow read, write: if request.auth != null;           ║
+║      }                                                       ║
+║    }                                                         ║
+║  }                                                           ║
+╚══════════════════════════════════════════════════════════════╝
+
+HOW TO DEPLOY:
+1. npm install -g firebase-tools
+2. firebase login
+3. firebase init hosting  (choose your project, public dir = ".", single-page app = yes)
+4. firebase deploy
+   → Your app will be live at https://YOUR-PROJECT-ID.web.app
+*/
+/* ════════════════════════════════════════════════════════════
+   FIREBASE CONFIG — paste your firebaseConfig object here
+   Get it from: Firebase Console → Project Settings → Your Apps
+   ════════════════════════════════════════════════════════════ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyA6L-jKOAQVxXUSWGE3PpdL95KxD6SEIKc",
+  authDomain: "st-martins-jjanya-ss.firebaseapp.com",
+  projectId: "st-martins-jjanya-ss",
+  storageBucket: "st-martins-jjanya-ss.firebasestorage.app",
+  messagingSenderId: "44290542108",
+  appId: "1:44290542108:web:ef3c40c5267666d9b0add9"
+};
+
+/* ════════ FIREBASE INIT ════════ */
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import {
+  getFirestore, doc, getDoc, getDocs, setDoc, deleteDoc,
+  collection, query, where, orderBy, addDoc, writeBatch,
+  serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import {
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signOut, onAuthStateChanged
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+const _app  = initializeApp(FIREBASE_CONFIG);
+const _db   = getFirestore(_app);
+const _auth = getAuth(_app);
+
+/* ════════════════════════════════════════════════════════════
+   FIRESTORE SHIM — same signatures as the old IndexedDB helpers
+   so none of the 110+ call sites need to change.
+
+   Store mapping:
+     'school'   → Firestore doc  school/config  (key-value fields)
+     'students' → Firestore collection  students/{id}
+     'marks'    → Firestore collection  marks/{_key}
+     'teachers' → Firestore collection  teachers/{username}
+     'parents'  → Firestore collection  parents/{username}
+     'classes'  → Firestore collection  classes/{name}
+     'subjects' → Firestore collection  subjects/{name}
+     'conduct'  → Firestore collection  conduct/{_key}
+     'circulars'→ Firestore collection  circulars/{id}
+   ════════════════════════════════════════════════════════════ */
+
+// ── school store: idbGet('school', key) / idbPut('school', value, key)
+// The 'school' store in IndexedDB was a KV store where the second arg was the key.
+// In Firestore we store all school config in one doc: school/config
+const _schoolRef = () => doc(_db, 'school', 'config');
+
+async function _getSchoolDoc() {
+  const snap = await getDoc(_schoolRef());
+  return snap.exists() ? snap.data() : {};
+}
+
+// idbGet shim
+async function idbGet(store, key) {
+  if (store === 'school') {
+    const data = await _getSchoolDoc();
+    return key in data ? data[key] : undefined;
+  }
+  // keyed collection
+  const keyField = _keyField(store);
+  const snap = await getDoc(doc(_db, store, String(key)));
+  if (!snap.exists()) return undefined;
+  const d = snap.data();
+  if (keyField === '_key') return d; // marks/conduct keep _key inside
+  return d;
+}
+
+// idbGetAll shim
+async function idbGetAll(store) {
+  if (store === 'school') {
+    // not used as getAll in practice; return empty
+    return [];
+  }
+  const snap = await getDocs(collection(_db, store));
+  return snap.docs.map(d => d.data());
+}
+
+// idbPut shim — put(store, value [, key])
+// For 'school': value is the data, key is the field name
+// For collections: value contains the document, key is derived from value
+async function idbPut(store, value, key) {
+  if (store === 'school') {
+    // key is the field name (e.g. 'adminPwHash', 'info')
+    await setDoc(_schoolRef(), { [key]: value }, { merge: true });
+    return;
+  }
+  const docId = _docId(store, value, key);
+  await setDoc(doc(_db, store, docId), value, { merge: true });
+}
+
+// idbDelete shim
+async function idbDelete(store, key) {
+  if (store === 'school') {
+    const data = await _getSchoolDoc();
+    delete data[key];
+    await setDoc(_schoolRef(), data);
+    return;
+  }
+  await deleteDoc(doc(_db, store, String(key)));
+}
+
+// idbGetByIndex shim — replaces index queries
+async function idbGetByIndex(store, indexName, value) {
+  const q = query(collection(_db, store), where(indexName, '==', value));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => d.data());
+}
+
+// idbCount shim
+async function idbCount(store) {
+  const snap = await getDocs(collection(_db, store));
+  return snap.size;
+}
+
+// idbClear shim — deletes all docs in a collection (batched)
+async function idbClear(store) {
+  const snap = await getDocs(collection(_db, store));
+  const BATCH_SIZE = 400;
+  for (let i = 0; i < snap.docs.length; i += BATCH_SIZE) {
+    const batch = writeBatch(_db);
+    snap.docs.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
+}
+
+// ── helpers ──
+function _keyField(store) {
+  const map = { students:'id', marks:'_key', teachers:'username', parents:'username',
+                classes:'name', subjects:'name', conduct:'_key', circulars:'id' };
+  return map[store] || 'id';
+}
+function _docId(store, value, explicitKey) {
+  if (explicitKey !== undefined) return String(explicitKey);
+  return String(value[_keyField(store)]);
+}
+
+/* ════════ CIRCULARS: autoIncrement simulation ════════
+   Firestore has no autoIncrement. We use a counter doc.  */
+async function _nextCircularId() {
+  const counterRef = doc(_db, 'school', 'circularCounter');
+  const snap = await getDoc(counterRef);
+  const next = snap.exists() ? (snap.data().n || 0) + 1 : 1;
+  await setDoc(counterRef, { n: next });
+  return next;
+}
+
+// Patch: circulars use addDoc in the original, but idbPut handles it now.
+// The circular save code calls idbPut('circulars', {...}) without an id,
+// so we intercept and assign the id first:
+const _origIdbPut = idbPut;
+async function idbPutCircular(circular) {
+  if (!circular.id) circular.id = await _nextCircularId();
+  await setDoc(doc(_db, 'circulars', String(circular.id)), circular, { merge: true });
+  return circular.id;
+}
+
+/* ════════ STATE ════════ */
+let currentTeacherObj = null;
+let currentSubject = '', currentClass = '', currentTerm = 1, currentYear = '';
+let learnerPage = 1, marksPage = 1;
+let marksUnsaved = false;
+const PER_PAGE = 50;
+
+/* ════════ CRYPTO HASH ════════ */
+async function hashPw(pw) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/* ════════ CLASS HELPERS ════════ */
+const DEFAULT_CLASSES=['S.1 East','S.1 West','S.2 East','S.2 West','S.3 East','S.3 West','S.4 East','S.4 West','S.5 Arts','S.5 Sciences','S.6 Arts','S.6 Sciences'];
+
+async function getClasses(){
+  const stored=await idbGetAll('classes');
+  if(stored.length) return stored.map(c=>c.name).sort();
+  // Seed defaults on first run
+  for(const name of DEFAULT_CLASSES) await idbPut('classes',{name});
+  return DEFAULT_CLASSES;
+}
+
+async function populateClassSelects(){
+  const classes=await getClasses();
+  const opts=classes.map(c=>`<option value="${c}">${c}</option>`).join('');
+  ['studentClass','editStudentClass','classSelect'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){const prev=el.value;el.innerHTML=opts;if(prev)el.value=prev;}
+  });
+}
+
+async function renderClassManager(){
+  const classes=await getClasses();
+  const el=document.getElementById('classManagerList');
+  if(!el)return;
+  el.innerHTML=classes.map(c=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--soft);border:1px solid var(--border);border-radius:9px;padding:9px 14px;margin-bottom:7px">
+      <span style="font-weight:600;color:var(--navy)">${c}</span>
+      <button class="btn btn-danger btn-xs" onclick="deleteClass('${c.replace(/'/g,"\\'")}')">🗑 Remove</button>
+    </div>`).join('');
+}
+
+async function addClass(){
+  const input=document.getElementById('newClassName');
+  const name=input.value.trim();
+  if(!name){showAlert('classAlert','Please enter a class name.','error');return;}
+  const existing=await idbGet('classes',name);
+  if(existing){showAlert('classAlert','That class already exists.','error');return;}
+  await idbPut('classes',{name});
+  input.value='';
+  await renderClassManager();
+  await populateClassSelects();
+  showAlert('classAlert',`✅ Class "${name}" added.`);
+}
+
+async function deleteClass(name){
+  const students=await idbGetByIndex('students','className',name);
+  if(students.length){
+    if(!confirm(`"${name}" has ${students.length} learner(s). Remove class anyway? Learners will not be deleted.`))return;
+  }
+  await idbDelete('classes',name);
+  await renderClassManager();
+  await populateClassSelects();
+  showAlert('classAlert',`Class "${name}" removed.`,'error');
+}
+
+/* ════════ SUBJECT HELPERS ════════ */
+const DEFAULT_SUBJECTS=[
+  'Mathematics','English Language','Literature in English',
+  'Luganda','Kiswahili','Arabic','French',
+  'Physics','Chemistry','Biology',
+  'Agriculture','Sub-Mathematics',
+  'History','Geography',
+  'Christian Religious Education (CRE)','Islamic Religious Education (IRE)',
+  'Divinity','Economics','Commerce',
+  'Accounting','Entrepreneurship',
+  'Computer Studies','Fine Art','Music',
+  'Physical Education (PE)','Design & Technology (DIT)',
+  'Technical Drawing','Food & Nutrition','Home Economics',
+  'Projects'
+];
+
+async function getSubjects(){
+  const stored=await idbGetAll('subjects');
+  if(stored.length) return stored.map(s=>s.name).sort();
+  // Seed defaults on first run
+  for(const name of DEFAULT_SUBJECTS) await idbPut('subjects',{name});
+  return [...DEFAULT_SUBJECTS].sort();
+}
+
+async function populateSubjectSelects(){
+  const subjects=await getSubjects();
+  const opts=subjects.map(s=>`<option value="${s}">${s}</option>`).join('');
+  const multi=document.getElementById('newTeacherSubjects');
+  if(multi){const prevSel=[...multi.selectedOptions].map(o=>o.value);multi.innerHTML=opts;[...multi.options].forEach(o=>{if(prevSel.includes(o.value))o.selected=true;});}
+}
+
+async function renderSubjectManager(){
+  const subjects=await getSubjects();
+  const el=document.getElementById('subjectManagerList');
+  if(!el)return;
+  el.innerHTML=subjects.map(s=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--soft);border:1px solid var(--border);border-radius:9px;padding:9px 14px;margin-bottom:7px">
+      <span style="font-weight:600;color:var(--navy)">${s}</span>
+      <button class="btn btn-danger btn-xs" onclick="deleteSubject('${s.replace(/'/g,"\\'")}')">🗑 Remove</button>
+    </div>`).join('');
+}
+
+async function addSubject(){
+  const input=document.getElementById('newSubjectName');
+  const name=input.value.trim();
+  if(!name){showAlert('subjectAlert','Please enter a subject name.','error');return;}
+  const existing=await idbGet('subjects',name);
+  if(existing){showAlert('subjectAlert','That subject already exists.','error');return;}
+  await idbPut('subjects',{name});
+  input.value='';
+  await renderSubjectManager();
+  await populateSubjectSelects();
+  showAlert('subjectAlert',`✅ Subject "${name}" added.`);
+}
+
+async function deleteSubject(name){
+  const teachers=await idbGetAll('teachers');
+  const inUse=teachers.filter(t=>t.subjects&&t.subjects.includes(name));
+  if(inUse.length){
+    if(!confirm(`"${name}" is assigned to ${inUse.length} teacher(s). Remove subject anyway? Teacher assignments will not be changed.`))return;
+  }
+  await idbDelete('subjects',name);
+  await renderSubjectManager();
+  await populateSubjectSelects();
+  showAlert('subjectAlert',`Subject "${name}" removed.`,'error');
+}
+
+/* ════════ S.3 / S.4 SUBJECT COMBINATION RULES ════════ */
+// S.3 and S.4 learners take 7 compulsory subjects + exactly 2 chosen electives = 9 total.
+const S3S4_COMPULSORY_SUBJECTS=['Mathematics','English Language','Physics','Chemistry','Biology','History','Geography'];
+const S3S4_ELECTIVE_COUNT=2;
+
+function isS3orS4(className){
+  return /^S\.?3\b|^S\.?4\b/.test((className||'').trim());
+}
+
+async function getElectiveOptions(){
+  const all=await getSubjects();
+  return all.filter(s=>!S3S4_COMPULSORY_SUBJECTS.includes(s));
+}
+
+// A student's full effective subject list: compulsories + electives if S.3/S.4, otherwise whatever was registered (or all, if none set — for non-S.3/S.4 classes).
+function effectiveSubjects(student){
+  if(isS3orS4(student.className)){
+    const electives=(student.registeredSubjects||[]).filter(s=>!S3S4_COMPULSORY_SUBJECTS.includes(s));
+    return [...S3S4_COMPULSORY_SUBJECTS,...electives];
+  }
+  return student.registeredSubjects&&student.registeredSubjects.length?student.registeredSubjects:null; // null = no restriction
+}
+
+// Renders the compulsory/elective subject picker into wrapId, based on the class currently selected in classSelectId.
+// If preselect is true, pulls existing electives from the student being edited (via window._editingElectives).
+async function renderSubjectCombo(classSelectId,wrapId,preselect){
+  const cls=document.getElementById(classSelectId).value;
+  const wrap=document.getElementById(wrapId);
+  if(!isS3orS4(cls)){wrap.style.display='none';wrap.innerHTML='';return;}
+  const electiveOptions=await getElectiveOptions();
+  const existing=(preselect&&window._editingElectives)?window._editingElectives:[];
+  wrap.style.display='block';
+  wrap.innerHTML=`
+    <div class="info-note" style="margin-top:0">📘 S.3/S.4 take <strong>${S3S4_COMPULSORY_SUBJECTS.length} compulsory subjects</strong> plus exactly <strong>${S3S4_ELECTIVE_COUNT} chosen electives</strong> (9 total).</div>
+    <div class="form-group">
+      <label>Compulsory Subjects</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${S3S4_COMPULSORY_SUBJECTS.map(s=>`<span class="badge badge-navy" style="font-size:11px">${s}</span>`).join('')}
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Choose exactly ${S3S4_ELECTIVE_COUNT} Electives</label>
+      <div id="${wrapId}_electives" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:160px;overflow-y:auto;border:1.5px solid var(--border);border-radius:9px;padding:10px;background:var(--soft)">
+        ${electiveOptions.map(s=>`<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;color:var(--text);cursor:pointer">
+          <input type="checkbox" value="${s.replace(/"/g,'&quot;')}" ${existing.includes(s)?'checked':''} onchange="enforceElectiveLimit('${wrapId}_electives')" style="width:auto;margin:0">${s}
+        </label>`).join('')}
+      </div>
+      <div id="${wrapId}_electiveCount" style="font-size:11px;color:var(--muted);margin-top:5px"></div>
+    </div>`;
+  enforceElectiveLimit(`${wrapId}_electives`);
+}
+
+// Disables remaining checkboxes once S3S4_ELECTIVE_COUNT are checked; shows a running count.
+function enforceElectiveLimit(containerId){
+  const container=document.getElementById(containerId);if(!container)return;
+  const boxes=[...container.querySelectorAll('input[type=checkbox]')];
+  const checked=boxes.filter(b=>b.checked);
+  boxes.forEach(b=>{if(!b.checked)b.disabled=checked.length>=S3S4_ELECTIVE_COUNT;});
+  const countEl=document.getElementById(containerId.replace('_electives','_electiveCount'));
+  if(countEl)countEl.textContent=`${checked.length} of ${S3S4_ELECTIVE_COUNT} selected`+(checked.length<S3S4_ELECTIVE_COUNT?' — pick '+(S3S4_ELECTIVE_COUNT-checked.length)+' more':'');
+}
+
+// Reads the checked electives from a combo wrap; returns null if the class isn't S.3/S.4 (no restriction applies).
+function readElectives(wrapId){
+  const container=document.getElementById(`${wrapId}_electives`);
+  if(!container)return null;
+  return [...container.querySelectorAll('input[type=checkbox]:checked')].map(b=>b.value);
+}
+
+/* ════════ PAGE / TAB SWITCHING ════════ */
+function switchPage(id){
+  document.querySelectorAll('.page').forEach(p=>{p.classList.remove('active');});
+  const el=document.getElementById(id);
+  if(el){el.classList.remove('hidden');el.classList.add('active');}
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  if(id.startsWith('admin'))document.querySelectorAll('.tab-btn')[0].classList.add('active');
+  if(id.startsWith('teacher'))document.querySelectorAll('.tab-btn')[1].classList.add('active');
+  if(id.startsWith('parent'))document.querySelectorAll('.tab-btn')[2].classList.add('active');
+  document.getElementById('logoutBtn').style.display=id==='admin-dashboard'?'inline-block':'none';
+}
+
+function switchAdminTab(tabId){
+  document.querySelectorAll('.admin-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.admin-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  event.target.classList.add('active');
+  if(tabId==='tab-analytics')renderAnalytics();
+  if(tabId==='tab-parents')renderParentList();
+  if(tabId==='tab-circulars'){renderCircularAdminList();}
+}
+
+function logoutAdmin(){switchPage('admin-gate');document.getElementById('adminPassword').value='';}
+
+function selectTermPill(term,btn){
+  currentTerm=term;
+  document.querySelectorAll('#teacherTermPills .term-pill').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* ════════ MODALS ════════ */
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
+
+/* ════════ GRADING ════════ */
+function getGrade(avg){
+  avg=Number(avg);
+  if(avg>=80)return'A';if(avg>=70)return'B';
+  if(avg>=55)return'C';if(avg>=45)return'D';return'E';
+}
+function gradeColor(g){return{A:'#16a34a',B:'#1d4ed8',C:'#d97706',D:'#ea580c',E:'#dc2626'}[g]||'#dc2626';}
+function gradeBadgeClass(g){return{A:'badge-a',B:'badge-b',C:'badge-c',D:'badge-d',E:'badge-e'}[g]||'badge-e';}
+function getComment(g){return{A:'Accomplished',B:'Outstanding',C:'Modulate',D:'Basic',E:'Elementary'}[g]||'—';}
+
+function calcActivitiesScaled(a1,a2,a3){return((Number(a1)+Number(a2)+Number(a3))/9)*20;}
+function calcTotal(a1,a2,a3,exam){return(calcActivitiesScaled(a1,a2,a3)+Number(exam)).toFixed(1);}
+
+/* ════════ ALERTS ════════ */
+function showAlert(id,msg,type='success'){
+  const el=document.getElementById(id);if(!el)return;
+  el.className=`alert alert-${type} show`;
+  el.innerHTML=(type==='success'?'✅ ':type==='info'?'ℹ️ ':'❌ ')+msg;
+  setTimeout(()=>el.classList.remove('show'),5000);
+}
+
+/* ════════ IMAGE HELPERS ════════ */
+function compressImage(file,maxW,maxH,quality=0.82){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=()=>reject(new Error('Could not read file.'));
+    reader.onload=e=>{
+      const img=new Image();
+      img.onerror=()=>reject(new Error('Could not load image.'));
+      img.onload=()=>{
+        let w=img.width,h=img.height;
+        if(w>maxW||h>maxH){const r=Math.min(maxW/w,maxH/h);w=Math.round(w*r);h=Math.round(h*r);}
+        const canvas=document.createElement('canvas');
+        canvas.width=w;canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL('image/jpeg',quality));
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function kb(dataUrl){return Math.round(dataUrl.length*0.75/1024);}
+
+function previewImage(input,wrapId,imgId,sizeId,maxW,maxH){
+  const file=input.files[0];
+  const wrap=document.getElementById(wrapId);
+  if(!file){wrap.style.display='none';return;}
+  compressImage(file,maxW,maxH,0.85).then(dataUrl=>{
+    document.getElementById(imgId).src=dataUrl;
+    const sz=kb(dataUrl);
+    const sizeEl=document.getElementById(sizeId);
+    sizeEl.innerHTML=`✅ Ready — ~${sz} KB`;
+    sizeEl.style.color=sz>300?'var(--red)':'var(--green)';
+    wrap.style.display='flex';
+    input._compressed=dataUrl;
+  }).catch(err=>{wrap.style.display='none';input._compressed=null;alert('Image error: '+err.message);});
+}
+function removeLogo(){
+  const inp=document.getElementById('schoolLogo');
+  inp.value='';inp._compressed=null;
+  document.getElementById('logoPreview').style.display='none';
+  idbGet('school','info').then(info=>{if(info){info.logo='';idbPut('school',info,'info');}});
+  showAlert('schoolAlert','School logo removed.','error');
+}
+
+/* ════════ ADMIN LOGIN ════════ */
+async function loginAdmin(){
+  const pw=document.getElementById('adminPassword').value;
+  const storedHash=await idbGet('school','adminPwHash');
+  // Legacy plain-text upgrade path
+  const storedPlain=await idbGet('school','adminPw');
+  let ok=false;
+  if(storedHash){
+    ok=(await hashPw(pw))===storedHash;
+  } else if(storedPlain){
+    ok=pw===storedPlain;
+    if(ok){await idbPut('school',await hashPw(pw),'adminPwHash');await idbDelete('school','adminPw');}
+  } else {
+    ok=pw==='admin123';
+    if(ok) await idbPut('school',await hashPw('admin123'),'adminPwHash');
+  }
+  if(!ok){showAlert('adminAlert','Incorrect password.','error');return;}
+  const info=await idbGet('school','info')||{};
+  if(info.name)document.getElementById('schoolName').value=info.name;
+  if(info.motto)document.getElementById('schoolMotto').value=info.motto;
+  if(info.contact)document.getElementById('schoolContact').value=info.contact;
+  if(info.nextTermOpens)document.getElementById('nextTermOpens').value=info.nextTermOpens;
+  if(info.nextTermFees)document.getElementById('nextTermFees').value=info.nextTermFees;
+  if(info.logo){
+    document.getElementById('logoPreviewImg').src=info.logo;
+    document.getElementById('logoPreviewSize').innerHTML=`✅ Saved — ~${kb(info.logo)} KB`;
+    document.getElementById('logoPreviewSize').style.color='var(--green)';
+    document.getElementById('logoPreview').style.display='flex';
+  }
+  document.getElementById('reportYear').value=new Date().getFullYear();
+  document.getElementById('currentAcademicYear').value=info.academicYear||new Date().getFullYear();
+  await populateClassSelects();
+  await renderClassManager();
+  await populateSubjectSelects();
+  await renderSubjectManager();
+  await renderStats();
+  await renderLearnerTable();
+  await renderAdminMarks();
+  await loadReportStudents();
+  await populateClassFilters();
+  await renderTeacherList();
+  await renderParentList();
+  switchPage('admin-dashboard');
+}
+
+/* ════════ CHANGE PASSWORD ════════ */
+async function changePassword(){
+  const current=document.getElementById('currentPw').value;
+  const newPw=document.getElementById('newPw').value;
+  const confirm=document.getElementById('confirmPw').value;
+  const storedHash=await idbGet('school','adminPwHash');
+  const storedPlain=await idbGet('school','adminPw');
+  let ok=false;
+  if(storedHash) ok=(await hashPw(current))===storedHash;
+  else if(storedPlain) ok=current===storedPlain;
+  else ok=current==='admin123';
+  if(!current||!newPw||!confirm){showAlert('pwAlert','Please fill in all three fields.','error');return;}
+  if(!ok){showAlert('pwAlert','Current password is incorrect.','error');return;}
+  if(newPw.length<6){showAlert('pwAlert','New password must be at least 6 characters.','error');return;}
+  if(newPw!==confirm){showAlert('pwAlert','New passwords do not match.','error');return;}
+  await idbPut('school',await hashPw(newPw),'adminPwHash');
+  if(storedPlain) await idbDelete('school','adminPw');
+  document.getElementById('currentPw').value='';
+  document.getElementById('newPw').value='';
+  document.getElementById('confirmPw').value='';
+  showAlert('pwAlert','Password updated successfully.');
+}
+
+/* ════════ STATS ════════ */
+async function renderStats(){
+  const [sCount,mCount,tCount,students,marks]=await Promise.all([
+    idbCount('students'),idbCount('marks'),idbCount('teachers'),
+    idbGetAll('students'),idbGetAll('marks')
+  ]);
+  const cls=new Set(students.map(s=>s.className)).size;
+  const subjs=new Set(marks.map(m=>m.subject)).size;
+  const passCount=marks.filter(m=>Number(m.total)>=45).length;
+  const passRate=mCount?Math.round(passCount/mCount*100):0;
+  document.getElementById('statCards').innerHTML=`
+    <div class="stat-card"><div class="stat-icon blue">👤</div><div><div class="stat-val">${sCount}</div><div class="stat-lbl">Registered Learners</div></div></div>
+    <div class="stat-card"><div class="stat-icon gold">📚</div><div><div class="stat-val">${cls}</div><div class="stat-lbl">Active Classes</div></div></div>
+    <div class="stat-card"><div class="stat-icon green">📝</div><div><div class="stat-val">${mCount}</div><div class="stat-lbl">Mark Entries</div></div></div>
+    <div class="stat-card"><div class="stat-icon purple">🎓</div><div><div class="stat-val">${subjs}</div><div class="stat-lbl">Subjects Assessed</div></div></div>
+    <div class="stat-card"><div class="stat-icon teal">👩‍🏫</div><div><div class="stat-val">${tCount}</div><div class="stat-lbl">Teacher Accounts</div></div></div>
+    <div class="stat-card"><div class="stat-icon ${passRate>=50?'green':'red'}">✅</div><div><div class="stat-val">${passRate}%</div><div class="stat-lbl">Overall Pass Rate</div></div></div>`;
+}
+
+/* ════════ SCHOOL INFO ════════ */
+async function saveSchoolInfo(){
+  const info={
+    name:document.getElementById('schoolName').value.trim(),
+    motto:document.getElementById('schoolMotto').value.trim(),
+    contact:document.getElementById('schoolContact').value.trim(),
+    nextTermOpens:document.getElementById('nextTermOpens').value.trim(),
+    nextTermFees:document.getElementById('nextTermFees').value.trim(),
+    academicYear:document.getElementById('currentAcademicYear').value.trim(),
+    logo:(await idbGet('school','info')||{}).logo||''
+  };
+  const compressed=document.getElementById('schoolLogo')._compressed||null;
+  if(compressed)info.logo=compressed;
+  await idbPut('school',info,'info');
+  showAlert('schoolAlert','School information saved successfully.');
+}
+
+/* ════════ TEACHER ACCOUNTS ════════ */
+async function saveNewTeacher(){
+  const name=document.getElementById('newTeacherName').value.trim();
+  const username=document.getElementById('newTeacherUsername').value.trim().toLowerCase().replace(/\s+/g,'.');
+  const pw=document.getElementById('newTeacherPw').value;
+  const subjectSel=document.getElementById('newTeacherSubjects');
+  const subjects=[...subjectSel.selectedOptions].map(o=>o.value);
+  if(!name||!username||!pw){showAlert('addTeacherAlert','Please fill in name, username and password.','error');return;}
+  if(pw.length<6){showAlert('addTeacherAlert','Password must be at least 6 characters.','error');return;}
+  const existing=await idbGet('teachers',username);
+  if(existing){showAlert('addTeacherAlert','A teacher with that username already exists.','error');return;}
+  const pwHash=await hashPw(pw);
+  await idbPut('teachers',{username,name,pwHash,subjects});
+  closeModal('addTeacherModal');
+  await renderTeacherList();
+  await renderStats();
+  showAlert('transferAlert',`✅ Teacher account "${name}" (${username}) created.`);
+}
+
+async function deleteTeacher(username){
+  if(!confirm(`Delete teacher account "${username}"? This cannot be undone.`))return;
+  await idbDelete('teachers',username);
+  await renderTeacherList();
+  await renderStats();
+}
+
+async function renderTeacherList(){
+  const teachers=await idbGetAll('teachers');
+  const el=document.getElementById('teacherList');if(!el)return;
+  if(!teachers.length){
+    el.innerHTML='<div class="warn-note">⚠️ No teacher accounts yet. Add teacher accounts so they can log in from their phones and PCs.</div>';
+    return;
+  }
+  el.innerHTML=teachers.map(t=>`
+    <div class="teacher-card">
+      <div class="teacher-info">
+        <div class="teacher-name">👩‍🏫 ${t.name}</div>
+        <div class="teacher-meta">Username: <strong>${t.username}</strong> · Subjects: ${t.subjects&&t.subjects.length?t.subjects.join(', '):'All'}</div>
+      </div>
+      <button class="btn btn-danger btn-xs" onclick="deleteTeacher('${t.username}')">🗑 Delete</button>
+    </div>`).join('');
+}
+
+/* ════════ TEACHER LOGIN ════════ */
+async function teacherLogin(){
+  const username=document.getElementById('teacherUsername').value.trim().toLowerCase();
+  const pw=document.getElementById('teacherLoginPw').value;
+  if(!username||!pw){showAlert('teacherLoginAlert','Please enter username and password.','error');return;}
+  const teacher=await idbGet('teachers',username);
+  if(!teacher){showAlert('teacherLoginAlert','Incorrect username or password. Ask admin for your login details.','error');return;}
+  // Support both hashed (new) and plain (legacy migration)
+  let ok=false;
+  if(teacher.pwHash) ok=(await hashPw(pw))===teacher.pwHash;
+  else if(teacher.password) ok=pw===teacher.password;
+  if(!ok){showAlert('teacherLoginAlert','Incorrect username or password.','error');return;}
+  // Migrate plain password to hash
+  if(teacher.password&&!teacher.pwHash){
+    teacher.pwHash=await hashPw(teacher.password);
+    delete teacher.password;
+    await idbPut('teachers',teacher);
+  }
+  currentTeacherObj=teacher;
+  // Load academic year from school info
+  const info=await idbGet('school','info')||{};
+  currentYear=info.academicYear||String(new Date().getFullYear());
+  document.getElementById('teacherWelcome').textContent=`Welcome, ${teacher.name}`;
+  document.getElementById('teacherSubjectsList').textContent=`Your subjects: ${teacher.subjects&&teacher.subjects.length?teacher.subjects.join(', '):'All subjects'}`;
+  const sel=document.getElementById('teacherSubjectSelect');
+  const subjects=teacher.subjects&&teacher.subjects.length?teacher.subjects:await getSubjects();
+  sel.innerHTML=subjects.map(s=>`<option value="${s}">${s}</option>`).join('');
+  // Load classes dynamically
+  const classes=await getClasses();
+  const classEl=document.getElementById('classSelect');
+  classEl.innerHTML=classes.map(c=>`<option value="${c}">${c}</option>`).join('');
+  switchPage('teacher-dashboard');
+  renderCircularReadList('teacherCircularList');
+}
+
+async function openMarksheet(){
+  if(!currentTeacherObj){switchPage('teacher-gate');return;}
+  currentSubject=document.getElementById('teacherSubjectSelect').value;
+  currentClass=document.getElementById('classSelect').value;
+  // currentTerm set by pill
+  document.getElementById('sheetTitle').textContent=`${currentSubject} — ${currentClass} — Term ${currentTerm} (${currentYear})`;
+  document.getElementById('teacherInfo').textContent=`Teacher: ${currentTeacherObj.name} · Logged in as: ${currentTeacherObj.username}`;
+  document.getElementById('lastSavedLabel').textContent='';
+  marksUnsaved=false;
+  await renderClassSheet();
+  switchPage('teacher-sheet');
+}
+
+/* ════════ REGISTER STUDENT ════════ */
+async function saveStudent(){
+  const name=document.getElementById('studentName').value.trim();
+  const id=document.getElementById('studentId').value.trim().toUpperCase();
+  const cls=document.getElementById('studentClass').value;
+  if(!name||!id){showAlert('studentAlert','Please fill in both name and ID.','error');return;}
+  // S.3/S.4: validate exactly 2 electives chosen
+  let registeredSubjects=[];
+  if(isS3orS4(cls)){
+    const electives=readElectives('studentComboWrap');
+    if(!electives||electives.length!==S3S4_ELECTIVE_COUNT){
+      showAlert('studentAlert',`Please choose exactly ${S3S4_ELECTIVE_COUNT} elective subjects for ${cls}.`,'error');return;
+    }
+    registeredSubjects=[...S3S4_COMPULSORY_SUBJECTS,...electives];
+  }
+  const existing=await idbGet('students',id);
+  if(existing){showAlert('studentAlert','A learner with that ID already exists.','error');return;}
+  const compressed=document.getElementById('studentPhoto')._compressed||'';
+  await idbPut('students',{id,name,className:cls,photo:compressed,registeredSubjects});
+  document.getElementById('studentName').value='';
+  document.getElementById('studentId').value='';
+  const photoInp=document.getElementById('studentPhoto');
+  photoInp.value='';photoInp._compressed=null;
+  document.getElementById('photoPreview').style.display='none';
+  document.getElementById('studentComboWrap').style.display='none';
+  document.getElementById('studentComboWrap').innerHTML='';
+  showAlert('studentAlert',`✅ ${name} (${id}) registered with ${registeredSubjects.length||'all'} subjects.`);
+  await renderStats();await renderLearnerTable();await loadReportStudents();await populateClassFilters();
+}
+
+/* ════════ BULK IMPORT STUDENTS ════════ */
+async function bulkImportStudents(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws);
+      let added=0,skipped=0;
+      for(const row of rows){
+        const id=(row['Learner ID']||row['ID']||'').toString().trim().toUpperCase();
+        const name=(row['Full Name']||row['Name']||'').toString().trim();
+        const cls=(row['Class']||'').toString().trim();
+        if(!id||!name){skipped++;continue;}
+        const existing=await idbGet('students',id);
+        if(existing){skipped++;continue;}
+        // Handle S.3/S.4 subject combinations from "Subjects" column (comma-separated electives)
+        let registeredSubjects=[];
+        if(isS3orS4(cls)){
+          const subjectCol=(row['Subjects']||row['Electives']||'').toString().trim();
+          const electives=subjectCol?subjectCol.split(',').map(s=>s.trim()).filter(Boolean):[];
+          const validElectives=electives.filter(s=>!S3S4_COMPULSORY_SUBJECTS.includes(s));
+          if(validElectives.length!==S3S4_ELECTIVE_COUNT){skipped++;continue;} // must have exactly 2 valid electives
+          registeredSubjects=[...S3S4_COMPULSORY_SUBJECTS,...validElectives];
+        }
+        await idbPut('students',{id,name,className:cls||'S.1 East',photo:'',registeredSubjects});
+        added++;
+      }
+      input.value='';
+      showAlert('studentAlert',`✅ Bulk import done — Added ${added} learner(s), skipped ${skipped} (duplicates/blanks).`);
+      await renderStats();await renderLearnerTable();await loadReportStudents();await populateClassFilters();
+    }catch(err){input.value='';showAlert('studentAlert','Bulk import failed: '+err.message,'error');}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ════════ EDIT STUDENT ════════ */
+async function openEditStudent(id){
+  const student=await idbGet('students',id);if(!student)return;
+  document.getElementById('editStudentOrigId').value=id;
+  document.getElementById('editStudentName').value=student.name;
+  document.getElementById('editStudentId').value=student.id;
+  document.getElementById('editStudentClass').value=student.className;
+  document.getElementById('editPhotoPreview').style.display='none';
+  const inp=document.getElementById('editStudentPhoto');inp.value='';inp._compressed=null;
+  if(student.photo){
+    document.getElementById('editPhotoPreviewImg').src=student.photo;
+    document.getElementById('editPhotoPreviewSize').textContent=`Saved photo — ~${kb(student.photo)} KB`;
+    document.getElementById('editPhotoPreview').style.display='flex';
+  }
+  // Pre-load existing electives for S.3/S.4
+  window._editingElectives=(student.registeredSubjects||[]).filter(s=>!S3S4_COMPULSORY_SUBJECTS.includes(s));
+  await renderSubjectCombo('editStudentClass','editComboWrap',true);
+  openModal('editStudentModal');
+}
+
+async function saveEditStudent(){
+  const origId=document.getElementById('editStudentOrigId').value;
+  const newName=document.getElementById('editStudentName').value.trim();
+  const newId=document.getElementById('editStudentId').value.trim().toUpperCase();
+  const newClass=document.getElementById('editStudentClass').value;
+  if(!newName||!newId){showAlert('editStudentAlert','Name and ID are required.','error');return;}
+  // S.3/S.4: validate electives
+  let registeredSubjects=[];
+  if(isS3orS4(newClass)){
+    const electives=readElectives('editComboWrap');
+    if(!electives||electives.length!==S3S4_ELECTIVE_COUNT){
+      showAlert('editStudentAlert',`Please choose exactly ${S3S4_ELECTIVE_COUNT} elective subjects for ${newClass}.`,'error');return;
+    }
+    registeredSubjects=[...S3S4_COMPULSORY_SUBJECTS,...electives];
+  }
+  const oldStudent=await idbGet('students',origId);
+  if(!oldStudent){showAlert('editStudentAlert','Student not found.','error');return;}
+  if(newId!==origId){
+    const conflict=await idbGet('students',newId);
+    if(conflict){showAlert('editStudentAlert','That Learner ID is already taken.','error');return;}
+  }
+  const newPhoto=document.getElementById('editStudentPhoto')._compressed||oldStudent.photo||'';
+  const updatedStudent={id:newId,name:newName,className:newClass,photo:newPhoto,registeredSubjects};
+  if(newId!==origId){
+    await idbDelete('students',origId);
+    const oldMarks=await idbGetByIndex('marks','studentId',origId);
+    for(const m of oldMarks){
+      await idbDelete('marks',m._key);
+      m.studentId=newId;
+      m._key=`${newId}:${m.subject}:${m.term}`;
+      m.className=newClass;
+      await idbPut('marks',m);
+    }
+    const oldConducts=await idbGetAll('conduct');
+    for(const c of oldConducts){
+      if(c.studentId===origId){
+        await idbDelete('conduct',c._key);
+        c.studentId=newId;
+        c._key=`${newId}:${c.term}`;
+        await idbPut('conduct',c);
+      }
+    }
+  }
+  await idbPut('students',updatedStudent);
+  closeModal('editStudentModal');
+  showAlert('studentAlert',`✅ Learner "${newName}" updated successfully.`);
+  await renderStats();await renderLearnerTable();await loadReportStudents();await populateClassFilters();
+}
+
+async function deleteStudent(id){
+  if(!confirm(`Delete learner ${id} and all their marks? This cannot be undone.`))return;
+  await idbDelete('students',id);
+  const marks=await idbGetByIndex('marks','studentId',id);
+  for(const m of marks)await idbDelete('marks',m._key);
+  const conducts=await idbGetAll('conduct');
+  for(const c of conducts){if(c.studentId===id)await idbDelete('conduct',c._key);}
+  await renderStats();await renderLearnerTable();await renderAdminMarks();await loadReportStudents();
+  showAlert('studentAlert','Learner deleted.','error');
+}
+
+async function clearAll(){
+  if(!confirm('Delete ALL learners, marks, and conduct records? This cannot be undone.'))return;
+  await idbClear('students');await idbClear('marks');await idbClear('conduct');
+  await renderStats();await renderLearnerTable();await renderAdminMarks();await loadReportStudents();
+  showAlert('studentAlert','All data cleared.','error');
+}
+
+/* ════════ LEARNER TABLE ════════ */
+async function renderLearnerTable(){
+  const search=(document.getElementById('learnerSearch')?.value||'').toLowerCase();
+  const classF=document.getElementById('learnerClassFilter')?.value||'';
+  let students=await idbGetAll('students');
+  students=students.filter(s=>{
+    const t=s.name.toLowerCase().includes(search)||s.id.toLowerCase().includes(search);
+    const c=!classF||s.className===classF;
+    return t&&c;
+  }).sort((a,b)=>a.name.localeCompare(b.name));
+  const total=students.length;
+  const totalPages=Math.max(1,Math.ceil(total/PER_PAGE));
+  if(learnerPage>totalPages)learnerPage=totalPages;
+  const slice=students.slice((learnerPage-1)*PER_PAGE,learnerPage*PER_PAGE);
+  const body=document.querySelector('#learnersTable tbody');if(!body)return;
+  body.innerHTML='';
+  if(!slice.length){
+    body.innerHTML='<tr class="empty-row"><td colspan="6">No learners found.</td></tr>';
+  } else {
+    slice.forEach((s,i)=>{
+      const n=(learnerPage-1)*PER_PAGE+i+1;
+      const ph=s.photo?`<img src="${s.photo}" style="width:30px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">`:'<span style="color:var(--muted);font-size:17px">👤</span>';
+      body.innerHTML+=`<tr>
+        <td style="color:var(--muted);font-size:12px">${n}</td>
+        <td><strong>${s.name}</strong></td>
+        <td style="font-family:monospace;font-size:12px">${s.id}</td>
+        <td><span class="badge badge-navy">${s.className}</span></td>
+        <td>${ph}</td>
+        <td style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-outline btn-xs" onclick="openEditStudent('${s.id}')">✏️ Edit</button>
+          <button class="btn btn-danger btn-xs" onclick="deleteStudent('${s.id}')">🗑</button>
+        </td>
+      </tr>`;
+    });
+  }
+  renderPagination('learnerPagination',learnerPage,totalPages,total,'learnerPage','renderLearnerTable');
+}
+
+/* ════════ CLASS FILTERS ════════ */
+async function populateClassFilters(){
+  const students=await idbGetAll('students');
+  const classes=[...new Set(students.map(s=>s.className))].sort();
+  ['learnerClassFilter','marksClassFilter','analyticsClass'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel)return;
+    const cur=sel.value;
+    sel.innerHTML='<option value="">All Classes</option>'+classes.map(c=>`<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
+  });
+}
+
+/* ════════ PAGINATION ════════ */
+function renderPagination(containerId,current,total,itemCount,pageVar,renderFn){
+  const el=document.getElementById(containerId);if(!el)return;
+  if(total<=1){el.innerHTML='';return;}
+  let html=`<span class="page-info">Showing ${Math.min((current-1)*PER_PAGE+1,itemCount)}–${Math.min(current*PER_PAGE,itemCount)} of ${itemCount}</span>`;
+  html+=`<button onclick="window.${pageVar}=Math.max(1,window.${pageVar}-1);${renderFn}()" ${current===1?'disabled':''}>‹ Prev</button>`;
+  let start=Math.max(1,current-3),end=Math.min(total,start+6);
+  start=Math.max(1,end-6);
+  for(let p=start;p<=end;p++){
+    html+=`<button class="${p===current?'active':''}" onclick="window.${pageVar}=${p};${renderFn}()">${p}</button>`;
+  }
+  html+=`<button onclick="window.${pageVar}=Math.min(${total},window.${pageVar}+1);${renderFn}()" ${current===total?'disabled':''}>Next ›</button>`;
+  el.innerHTML=html;
+}
+
+/* ════════ CLASS SHEET ════════ */
+async function renderClassSheet(){
+  let students=await idbGetByIndex('students','className',currentClass);
+  students.sort((a,b)=>a.name.localeCompare(b.name));
+  // For S.3/S.4, only show students registered for this subject
+  if(isS3orS4(currentClass)){
+    students=students.filter(s=>{
+      const subs=effectiveSubjects(s);
+      return subs?subs.includes(currentSubject):true;
+    });
+  }
+  const allMarks=await idbGetAll('marks');
+  const body=document.querySelector('#classTable tbody');
+  body.innerHTML='';
+  if(!students.length){
+    const msg=isS3orS4(currentClass)
+      ?`No learners in ${currentClass} registered for ${currentSubject}.`
+      :`No learners in ${currentClass} yet. Ask admin to register them.`;
+    body.innerHTML=`<tr class="empty-row"><td colspan="9">${msg}</td></tr>`;return;
+  }
+  students.forEach(student=>{
+    const mk=`${student.id}:${currentSubject}:${currentTerm}:${currentYear}`;
+    // Fallback: also look for legacy key without year
+    const ex=allMarks.find(m=>m._key===mk)||allMarks.find(m=>m._key===`${student.id}:${currentSubject}:${currentTerm}`&&!m.year);
+    const a1=ex?ex.a1:'',a2=ex?ex.a2:'',a3=ex?ex.a3:'',exam=ex?ex.exam:'';
+    const actScaled=ex?Number(((Number(ex.a1)+Number(ex.a2)+Number(ex.a3))/9*20).toFixed(1)):'—';
+    const total=ex?ex.total:'—';
+    const grade=ex?getGrade(ex.total):'—';
+    const gc=ex?gradeColor(grade):'var(--muted)';
+    const comment=ex?getComment(grade):'—';
+    body.innerHTML+=`<tr>
+      <td><strong>${student.name}</strong><input type="hidden" class="studentId" value="${student.id}"></td>
+      <td><input class="a1"   type="number" min="0" max="3"  value="${a1}"   placeholder="0" step="0.5"></td>
+      <td><input class="a2"   type="number" min="0" max="3"  value="${a2}"   placeholder="0" step="0.5"></td>
+      <td><input class="a3"   type="number" min="0" max="3"  value="${a3}"   placeholder="0" step="0.5"></td>
+      <td class="live-act"     style="font-weight:600;color:var(--navy);font-size:12px">${actScaled}</td>
+      <td><input class="exam" type="number" min="0" max="80" value="${exam}" placeholder="0"></td>
+      <td class="live-total"   style="font-weight:700;color:var(--navy)">${total}</td>
+      <td class="live-grade"   style="font-weight:800;color:${gc}">${grade}</td>
+      <td class="live-comment" style="font-size:12px;color:${gc};font-style:italic">${comment}</td>
+    </tr>`;
+  });
+  document.querySelectorAll('#classTable tbody tr').forEach(row=>{
+    ['a1','a2','a3','exam'].forEach(c=>{
+      const inp=row.querySelector('.'+c);if(!inp)return;
+      inp.addEventListener('input',()=>{marksUnsaved=true;liveRow(row);});
+      inp.addEventListener('change',()=>{
+        const mx=Number(inp.max);
+        if(Number(inp.value)>mx)inp.value=mx;
+        if(Number(inp.value)<0)inp.value=0;
+        marksUnsaved=true;liveRow(row);
+      });
+    });
+  });
+}
+
+function liveRow(row){
+  const a1=Number(row.querySelector('.a1').value||0);
+  const a2=Number(row.querySelector('.a2').value||0);
+  const a3=Number(row.querySelector('.a3').value||0);
+  const exam=Number(row.querySelector('.exam').value||0);
+  if(!a1&&!a2&&!a3&&!exam)return;
+  const actScaled=(((a1+a2+a3)/9)*20).toFixed(1);
+  const total=calcTotal(a1,a2,a3,exam);
+  const grade=getGrade(total);
+  const color=gradeColor(grade);
+  row.querySelector('.live-act').textContent=actScaled;
+  row.querySelector('.live-total').textContent=total;
+  row.querySelector('.live-grade').textContent=grade;
+  row.querySelector('.live-grade').style.color=color;
+  row.querySelector('.live-comment').textContent=getComment(grade);
+  row.querySelector('.live-comment').style.color=color;
+}
+
+async function saveMarks(){
+  if(!currentTeacherObj){showAlert('marksAlert','Teacher login required.','error');return;}
+  const rows=document.querySelectorAll('#classTable tbody tr');
+  // Check for empty rows (warn user)
+  let emptyCount=0;
+  rows.forEach(row=>{
+    const a1=row.querySelector('.a1');
+    const exam=row.querySelector('.exam');
+    if(a1&&!a1.value&&exam&&!exam.value)emptyCount++;
+  });
+  if(emptyCount>0&&rows.length>1){
+    if(!confirm(`⚠️ ${emptyCount} learner(s) have no marks entered. They will be saved as zeros. Continue?`))return;
+  }
+  let saved=0;
+  for(const row of rows){
+    const idEl=row.querySelector('.studentId');if(!idEl)continue;
+    const studentId=idEl.value;
+    const student=await idbGet('students',studentId);
+    const a1=Math.min(3,Math.max(0,Number(row.querySelector('.a1').value||0)));
+    const a2=Math.min(3,Math.max(0,Number(row.querySelector('.a2').value||0)));
+    const a3=Math.min(3,Math.max(0,Number(row.querySelector('.a3').value||0)));
+    const exam=Math.min(80,Math.max(0,Number(row.querySelector('.exam').value||0)));
+    const actScaled=Number(((a1+a2+a3)/9*20).toFixed(1));
+    const total=calcTotal(a1,a2,a3,exam);
+    const entry={
+      _key:`${studentId}:${currentSubject}:${currentTerm}:${currentYear}`,
+      studentId,subject:currentSubject,
+      className:student?student.className:currentClass,
+      teacher:currentTeacherObj.name,term:currentTerm,year:currentYear,
+      a1,a2,a3,exam,actScaled,total,
+      savedAt:new Date().toISOString()
+    };
+    await idbPut('marks',entry);
+    saved++;
+  }
+  const now=new Date().toLocaleTimeString();
+  document.getElementById('lastSavedLabel').textContent=`Last saved: ${now} — ${saved} record(s)`;
+  marksUnsaved=false;
+  showAlert('marksAlert',`✅ ${saved} record(s) saved for Term ${currentTerm} (${currentYear}).`);
+  await renderClassSheet();
+}
+
+/* ════════ REPORT STUDENT LIST ════════ */
+async function loadReportStudents(){
+  const sel=document.getElementById('reportStudent');if(!sel)return;
+  const students=await idbGetAll('students');
+  students.sort((a,b)=>a.name.localeCompare(b.name));
+  sel.innerHTML=students.length
+    ?students.map(s=>`<option value="${s.id}">${s.name} (${s.className})</option>`).join('')
+    :'<option>— No learners registered yet —</option>';
+}
+
+/* ════════ CONDUCT / REMARKS ════════ */
+let conductStudentIdCache='', conductTermCache=1;
+
+async function openConductModal(){
+  const id=document.getElementById('reportStudent').value;
+  const termNum=Number(document.getElementById('reportTerm').value);
+  if(!id){alert('Please generate a report first.');return;}
+  conductStudentIdCache=id;conductTermCache=termNum;
+  document.getElementById('conductStudentId').value=id;
+  document.getElementById('conductTerm').value=termNum;
+  const key=`${id}:${termNum}:${document.getElementById('reportYear').value||new Date().getFullYear()}`;
+  const c=await idbGet('conduct',key)||await idbGet('conduct',`${id}:${termNum}`)||{};
+  document.getElementById('conductPunctuality').value=c.punctuality||'';
+  document.getElementById('conductDiscipline').value=c.discipline||'';
+  document.getElementById('conductParticipation').value=c.participation||'';
+  document.getElementById('conductDaysPresent').value=c.daysPresent||'';
+  document.getElementById('conductDaysTotal').value=c.daysTotal||'';
+  document.getElementById('conductTeacherRemark').value=c.teacherRemark||'';
+  document.getElementById('conductHtRemark').value=c.htRemark||'';
+  openModal('conductModal');
+}
+
+async function saveConductRemarks(){
+  const id=document.getElementById('conductStudentId').value;
+  const term=Number(document.getElementById('conductTerm').value);
+  const year=document.getElementById('reportYear').value||new Date().getFullYear();
+  const record={
+    _key:`${id}:${term}:${year}`,studentId:id,term,year,
+    punctuality:document.getElementById('conductPunctuality').value,
+    discipline:document.getElementById('conductDiscipline').value,
+    participation:document.getElementById('conductParticipation').value,
+    daysPresent:document.getElementById('conductDaysPresent').value,
+    daysTotal:document.getElementById('conductDaysTotal').value,
+    teacherRemark:document.getElementById('conductTeacherRemark').value.trim(),
+    htRemark:document.getElementById('conductHtRemark').value.trim()
+  };
+  await idbPut('conduct',record);
+  showAlert('conductAlert','Conduct & remarks saved!');
+  setTimeout(()=>{closeModal('conductModal');generateReport();},1200);
+}
+
+/* ════════ GENERATE REPORT CARD ════════ */
+let currentReportStudentId='', currentReportTerm=1;
+
+async function generateReport(){
+  const id=document.getElementById('reportStudent').value;
+  const termNum=Number(document.getElementById('reportTerm').value);
+  const year=document.getElementById('reportYear').value||new Date().getFullYear();
+  currentReportStudentId=id;currentReportTerm=termNum;
+  const [student,info,allStudents,allMarks,conduct]=await Promise.all([
+    idbGet('students',id),idbGet('school','info'),
+    idbGetAll('students'),idbGetAll('marks'),
+    idbGet('conduct',`${id}:${termNum}:${year}`).catch(()=>null).then(r=>r||idbGet('conduct',`${id}:${termNum}`))
+  ]);
+  const school=info||{};
+  if(!student){alert('Please select a learner.');return;}
+
+  const sMarks=allMarks.filter(m=>m.studentId===id&&Number(m.term)===termNum);
+  let totalSum=0,rows='';
+  sMarks.sort((a,b)=>a.subject.localeCompare(b.subject));
+  sMarks.forEach(mark=>{
+    totalSum+=Number(mark.total);
+    const grade=getGrade(mark.total);
+    const actS=Number(mark.actScaled||((Number(mark.a1)+Number(mark.a2)+Number(mark.a3))/9*20)).toFixed(1);
+    rows+=`<tr>
+      <td>${mark.subject}</td>
+      <td>${mark.a1}</td><td>${mark.a2}</td><td>${mark.a3}</td>
+      <td style="font-weight:700;color:#1a3270">${actS}</td>
+      <td>${mark.exam}</td>
+      <td style="font-weight:800">${mark.total}</td>
+      <td style="font-weight:800;color:${gradeColor(getGrade(mark.total))}">${getGrade(mark.total)}</td>
+      <td style="font-style:italic;color:${gradeColor(getGrade(mark.total))}">${getComment(getGrade(mark.total))}</td>
+      <td style="font-size:7pt;color:#666">${mark.teacher}</td>
+    </tr>`;
+  });
+
+  const finalAvg=sMarks.length?(totalSum/sMarks.length).toFixed(1):'0.0';
+  const finalGrade=getGrade(finalAvg);
+
+  const classStudents=allStudents.filter(s=>s.className===student.className);
+  const ranked=classStudents.map(s=>{
+    const sm=allMarks.filter(m=>m.studentId===s.id&&Number(m.term)===termNum);
+    return{id:s.id,avg:sm.length?(sm.reduce((a,m)=>a+Number(m.total),0)/sm.length):0};
+  }).sort((a,b)=>b.avg-a.avg);
+  const rank=ranked.findIndex(x=>x.id===id)+1;
+  const rankStr=rank?`${rank} / ${classStudents.length}`:'—';
+
+  // Remarks: custom if set, else auto
+  const autoTeacher=Number(finalAvg)>=80
+    ?'Excellent academic performance this term. Keep up the outstanding work!'
+    :Number(finalAvg)>=70?'Good academic progress. Continue working hard to achieve even better results.'
+    :Number(finalAvg)>=55?'Satisfactory performance. More effort and dedication is needed next term.'
+    :'Needs significant improvement. Please seek extra help and study harder next term.';
+  const autoHt=Number(finalAvg)>=70
+    ?'Well done! Continue striving for excellence in all subjects.'
+    :'More commitment to academics is required. Please work closely with your teachers.';
+  const teacherRemark=conduct?.teacherRemark||autoTeacher;
+  const htRemark=conduct?.htRemark||autoHt;
+
+  const logoHtml=school.logo?`<img class="rc-logo" src="${school.logo}" alt="Badge">`:`<div class="rc-logo-placeholder">🏫</div>`;
+  const photoHtml=student.photo?`<img class="rc-passport" src="${student.photo}" alt="Photo">`:`<div class="rc-passport-placeholder"><span>🧑</span><span style="font-size:7px;color:#aaa">No Photo</span></div>`;
+  if(!rows)rows=`<tr><td colspan="10" style="text-align:center;padding:12px;color:#888;font-style:italic">No marks submitted for Term ${termNum} yet.</td></tr>`;
+
+  const termOrdinal=['','1st','2nd','3rd'][termNum]||`${termNum}th`;
+  const c=conduct||{};
+
+  document.getElementById('reportOutput').innerHTML=buildReportHTML(
+    school,student,sMarks,rows,finalAvg,finalGrade,rankStr,classStudents.length,
+    termNum,termOrdinal,year,logoHtml,photoHtml,teacherRemark,htRemark,c
+  );
+  document.getElementById('downloadBtn').style.display='inline-flex';
+  document.getElementById('conductBtn').style.display='inline-flex';
+}
+
+function buildReportHTML(school,student,sMarks,rows,finalAvg,finalGrade,rankStr,classSize,termNum,termOrdinal,year,logoHtml,photoHtml,teacherRemark,htRemark,c){
+  return `<div class="a4-preview-wrap"><div class="a4-page" id="singleReportPage">
+    <div class="rc-watermark">OFFICIAL</div>
+    <div class="rc-topbar"></div>
+    <div class="rc-header">
+      ${logoHtml}
+      <div class="rc-school-block">
+        <div class="rc-school-name">${school.name||'SCHOOL NAME'}</div>
+        <div class="rc-school-motto">${school.motto||'Motto goes here'}</div>
+        <div class="rc-school-contact">${school.contact||''}</div>
+        <div style="margin-top:3px"><div class="rc-report-badge">${termOrdinal} Term Academic Report Card — ${year}</div></div>
+      </div>
+      ${photoHtml}
+    </div>
+    <hr class="rc-divider">
+    <div class="rc-student-strip">
+      <div class="rc-sfield"><div class="rc-sfield-label">Full Name</div><div class="rc-sfield-value">${student.name}</div></div>
+      <div class="rc-sfield"><div class="rc-sfield-label">Learner ID</div><div class="rc-sfield-value">${student.id}</div></div>
+      <div class="rc-sfield"><div class="rc-sfield-label">Class</div><div class="rc-sfield-value">${student.className}</div></div>
+      <div class="rc-sfield"><div class="rc-sfield-label">Subjects Done</div><div class="rc-sfield-value">${sMarks.length}</div></div>
+      <div class="rc-sfield"><div class="rc-sfield-label">Class Position</div><div class="rc-sfield-value">${rankStr}</div></div>
+      <div class="rc-sfield"><div class="rc-sfield-label">Academic Year</div><div class="rc-sfield-value">${year}</div></div>
+    </div>
+    <div class="rc-section-title">Academic Performance — Term ${termNum}</div>
+    <div class="rc-table-wrap">
+      <table class="rc-table">
+        <thead>
+          <tr>
+            <th rowspan="2" style="text-align:left;padding-left:7px">Subject</th>
+            <th colspan="3">Integration Activities (/3 each)</th>
+            <th rowspan="2">Act<br>/20</th>
+            <th rowspan="2">End Term<br>/80</th>
+            <th rowspan="2">Total<br>/100</th>
+            <th rowspan="2">Grade</th>
+            <th rowspan="2">Comment</th>
+            <th rowspan="2">Teacher</th>
+          </tr>
+          <tr><th style="font-size:6pt">A1/3</th><th style="font-size:6pt">A2/3</th><th style="font-size:6pt">A3/3</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="rc-section-title">Summary</div>
+    <div class="rc-summary">
+      <div class="rc-avg-box">
+        <div class="rc-avg-lbl">Overall Avg</div>
+        <div class="rc-avg-num">${finalAvg}</div>
+        <div class="rc-avg-grade">${finalGrade}</div>
+        <div style="font-size:6pt;opacity:0.6;margin-top:1px">out of 100</div>
+      </div>
+      <div class="rc-comments">
+        <p><strong>Class Teacher's Remarks:</strong> ${teacherRemark}</p>
+        <p style="margin-top:3px"><strong>Headteacher's Remarks:</strong> ${htRemark}</p>
+      </div>
+    </div>
+    <div class="rc-section-title">Conduct &amp; Behaviour</div>
+    <div class="rc-conduct">
+      <div class="rc-conduct-item"><div class="rc-conduct-label">Punctuality</div><div class="rc-conduct-val">${c.punctuality||'___________'}</div></div>
+      <div class="rc-conduct-item"><div class="rc-conduct-label">Discipline</div><div class="rc-conduct-val">${c.discipline||'___________'}</div></div>
+      <div class="rc-conduct-item"><div class="rc-conduct-label">Participation</div><div class="rc-conduct-val">${c.participation||'___________'}</div></div>
+      <div class="rc-conduct-item"><div class="rc-conduct-label">Days Present / Total</div><div class="rc-conduct-val">${c.daysPresent?c.daysPresent+' / '+(c.daysTotal||'?'):'_____ / _____'}</div></div>
+    </div>
+    <div class="rc-section-title">Marking Scheme &amp; Grade Key</div>
+    <div style="display:flex;gap:10px;position:relative;z-index:1;align-items:flex-start;flex-wrap:wrap">
+      <div style="font-size:7pt;background:#f4f7ff;border:1px solid #dde3f0;border-radius:6px;padding:4px 9px;min-width:190px">
+        <div style="font-weight:800;color:var(--navy);margin-bottom:1px">Marking Scheme</div>
+        <div>3 Integration Activities (A1+A2+A3) each /3</div>
+        <div>→ Total activities scaled to <strong>/20</strong></div>
+        <div>+ End of Term Exam = <strong>/80</strong></div>
+        <div style="margin-top:1px;font-weight:800;color:var(--navy)">Grand Total = /100</div>
+      </div>
+      <div class="rc-grade-key" style="flex:1">
+        <div class="rc-gk-item"><div class="rc-gk-dot" style="background:#16a34a"></div>A: 80–100 · Accomplished</div>
+        <div class="rc-gk-item"><div class="rc-gk-dot" style="background:#1d4ed8"></div>B: 70–79 · Outstanding</div>
+        <div class="rc-gk-item"><div class="rc-gk-dot" style="background:#d97706"></div>C: 55–69 · Modulate</div>
+        <div class="rc-gk-item"><div class="rc-gk-dot" style="background:#ea580c"></div>D: 45–54 · Basic</div>
+        <div class="rc-gk-item"><div class="rc-gk-dot" style="background:#dc2626"></div>E: 0–44 · Elementary</div>
+      </div>
+    </div>
+    <div class="rc-nextterm">
+      <div class="rc-nextterm-title">Next Term Information</div>
+      <div class="rc-nextterm-field"><label>School Opens:</label><span>${school.nextTermOpens||''}</span></div>
+      <div class="rc-nextterm-field"><label>Fees Due:</label><span>${school.nextTermFees||''}</span></div>
+    </div>
+    <div class="rc-sigs">
+      <div class="rc-sig"><div class="rc-sig-line"></div><div class="rc-sig-lbl">Class Teacher</div></div>
+      <div class="rc-sig"><div class="rc-sig-line"></div><div class="rc-sig-lbl">Headteacher</div></div>
+      <div class="rc-sig"><div class="rc-sig-line"></div><div class="rc-sig-lbl">Parent / Guardian</div></div>
+      <div class="rc-sig"><div class="rc-sig-line"></div><div class="rc-sig-lbl">Date</div></div>
+    </div>
+    <div class="rc-stamp">${school.name?school.name.substring(0,12):'SCHOOL'}<br>STAMP</div>
+    <div class="rc-bottombar"></div>
+  </div></div>`;
+}
+
+/* ════════ PRINT ALL REPORT CARDS ════════ */
+async function printAllReportCards(){
+  const id=document.getElementById('reportStudent').value;
+  const termNum=Number(document.getElementById('reportTerm').value);
+  const year=document.getElementById('reportYear').value||new Date().getFullYear();
+  const student=await idbGet('students',id);
+  if(!student){alert('Please select a learner to determine the class.');return;}
+  const className=student.className;
+  if(!confirm(`Print ALL report cards for ${className} — Term ${termNum}?\n\nThis will generate one page per learner.`))return;
+
+  const [allStudents,allMarks,info,allConducts]=await Promise.all([
+    idbGetAll('students'),idbGetAll('marks'),
+    idbGet('school','info'),idbGetAll('conduct')
+  ]);
+  const school=info||{};
+  const classStudents=allStudents.filter(s=>s.className===className).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!classStudents.length){alert('No learners found in this class.');return;}
+
+  const termOrdinal=['','1st','2nd','3rd'][termNum]||`${termNum}th`;
+  let allHTML='';
+
+  for(const st of classStudents){
+    const sMarks=allMarks.filter(m=>m.studentId===st.id&&Number(m.term)===termNum);
+    let totalSum=0,rows='';
+    sMarks.sort((a,b)=>a.subject.localeCompare(b.subject));
+    sMarks.forEach(mark=>{
+      totalSum+=Number(mark.total);
+      const grade=getGrade(mark.total);
+      const actS=Number(mark.actScaled||((Number(mark.a1)+Number(mark.a2)+Number(mark.a3))/9*20)).toFixed(1);
+      rows+=`<tr>
+        <td>${mark.subject}</td><td>${mark.a1}</td><td>${mark.a2}</td><td>${mark.a3}</td>
+        <td style="font-weight:700;color:#1a3270">${actS}</td>
+        <td>${mark.exam}</td>
+        <td style="font-weight:800">${mark.total}</td>
+        <td style="font-weight:800;color:${gradeColor(grade)}">${grade}</td>
+        <td style="font-style:italic;color:${gradeColor(grade)}">${getComment(grade)}</td>
+        <td style="font-size:7pt;color:#666">${mark.teacher}</td>
+      </tr>`;
+    });
+    if(!rows)rows=`<tr><td colspan="10" style="text-align:center;padding:10px;color:#888;font-style:italic">No marks for Term ${termNum}.</td></tr>`;
+
+    const finalAvg=sMarks.length?(totalSum/sMarks.length).toFixed(1):'0.0';
+    const finalGrade=getGrade(finalAvg);
+    const ranked=classStudents.map(s=>{
+      const sm=allMarks.filter(m=>m.studentId===s.id&&Number(m.term)===termNum);
+      return{id:s.id,avg:sm.length?(sm.reduce((a,m)=>a+Number(m.total),0)/sm.length):0};
+    }).sort((a,b)=>b.avg-a.avg);
+    const rank=ranked.findIndex(x=>x.id===st.id)+1;
+    const rankStr=`${rank} / ${classStudents.length}`;
+    const c=allConducts.find(cd=>cd.studentId===st.id&&Number(cd.term)===termNum)||{};
+
+    const autoTeacher=Number(finalAvg)>=80?'Excellent academic performance this term. Keep up the outstanding work!'
+      :Number(finalAvg)>=70?'Good academic progress. Continue working hard to achieve even better results.'
+      :Number(finalAvg)>=55?'Satisfactory performance. More effort and dedication is needed next term.'
+      :'Needs significant improvement. Please seek extra help and study harder next term.';
+    const autoHt=Number(finalAvg)>=70?'Well done! Continue striving for excellence in all subjects.'
+      :'More commitment to academics is required. Please work closely with your teachers.';
+    const teacherRemark=c.teacherRemark||autoTeacher;
+    const htRemark=c.htRemark||autoHt;
+    const logoHtml=school.logo?`<img class="rc-logo" src="${school.logo}" alt="Badge">`:`<div class="rc-logo-placeholder">🏫</div>`;
+    const photoHtml=st.photo?`<img class="rc-passport" src="${st.photo}" alt="Photo">`:`<div class="rc-passport-placeholder"><span>🧑</span><span style="font-size:7px;color:#aaa">No Photo</span></div>`;
+    allHTML+=buildReportHTML(school,st,sMarks,rows,finalAvg,finalGrade,rankStr,classStudents.length,termNum,termOrdinal,year,logoHtml,photoHtml,teacherRemark,htRemark,c);
+  }
+
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'DM Sans',sans-serif;background:white;}
+    :root{--navy:#0f1f4b;--navy-mid:#1a3270;--gold:#c9952a;--gold-light:#f0c96a;--border:#dde3f0;--muted:#6b7497;}
+    .a4-preview-wrap{display:block;}
+    .a4-page{width:210mm;min-height:297mm;background:#fff;padding:9mm 13mm 7mm;position:relative;overflow:hidden;font-size:10pt;font-family:'DM Sans',sans-serif;color:#111;display:flex;flex-direction:column;page-break-after:always;}
+    .rc-watermark{position:absolute;top:36%;left:14%;font-family:'Playfair Display',serif;font-size:68pt;font-weight:800;color:rgba(15,31,75,0.03);transform:rotate(-22deg);pointer-events:none;user-select:none;letter-spacing:6px;white-space:nowrap;}
+    .rc-topbar{height:7px;background:linear-gradient(90deg,#0f1f4b 0%,#c9952a 50%,#0f1f4b 100%);border-radius:4px;margin-bottom:7px;}
+    .rc-header{display:flex;align-items:center;gap:13px;margin-bottom:6px;}
+    .rc-logo{width:72px;height:72px;border-radius:50%;border:3px solid #0f1f4b;object-fit:cover;flex-shrink:0;background:#f0f4ff;}
+    .rc-logo-placeholder{width:72px;height:72px;border-radius:50%;border:3px dashed #aab;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;background:#f0f4ff;}
+    .rc-school-block{flex:1;text-align:center;}
+    .rc-school-name{font-family:'Playfair Display',serif;font-size:15pt;font-weight:800;color:#8b0000;letter-spacing:0.5px;line-height:1.1;}
+    .rc-school-motto{font-size:8.5pt;color:#555;font-style:italic;margin:2px 0;}
+    .rc-school-contact{font-size:7.5pt;color:#666;}
+    .rc-report-badge{display:inline-block;background:#0f1f4b;color:#fff;padding:3px 16px;border-radius:20px;font-size:7.5pt;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-top:4px;}
+    .rc-passport{width:68px;height:82px;border:2.5px solid #0f1f4b;border-radius:6px;object-fit:cover;flex-shrink:0;}
+    .rc-passport-placeholder{width:68px;height:82px;border:2px dashed #aab;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#f0f4ff;flex-direction:column;gap:3px;font-size:19px;color:#999;}
+    .rc-divider{border:none;border-top:2px solid #0f1f4b;margin:4px 0;}
+    .rc-student-strip{display:flex;border:1.5px solid #0f1f4b;border-radius:7px;overflow:hidden;margin-bottom:6px;}
+    .rc-sfield{flex:1;padding:5px 7px;border-right:1px solid #dde3f0;font-size:8pt;}
+    .rc-sfield:last-child{border-right:none;}
+    .rc-sfield-label{font-size:6pt;color:#6b7497;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;}
+    .rc-sfield-value{font-weight:700;color:#0f1f4b;margin-top:1px;}
+    .rc-section-title{font-size:7pt;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#0f1f4b;margin:5px 0 3px;border-bottom:1px solid #dde3f0;padding-bottom:2px;}
+    .rc-table{width:100%;border-collapse:collapse;font-size:8pt;}
+    .rc-table thead tr{background:#0f1f4b;}
+    .rc-table th{color:#fff;font-weight:700;padding:5px 4px;font-size:7pt;text-transform:uppercase;text-align:center;border:0.5px solid rgba(255,255,255,0.2);}
+    .rc-table th:first-child{text-align:left;padding-left:7px;}
+    .rc-table td{padding:3px 4px;border:0.5px solid #e2e8f0;text-align:center;}
+    .rc-table td:first-child{text-align:left;padding-left:7px;font-weight:600;}
+    .rc-table tbody tr:nth-child(even) td{background:#f7f9ff;}
+    .rc-summary{display:flex;gap:9px;margin-top:6px;}
+    .rc-avg-box{background:#0f1f4b;color:#fff;border-radius:8px;padding:7px 12px;text-align:center;flex-shrink:0;min-width:84px;}
+    .rc-avg-num{font-family:'Playfair Display',serif;font-size:18pt;font-weight:800;line-height:1;}
+    .rc-avg-lbl{font-size:6pt;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;}
+    .rc-avg-grade{font-size:13pt;font-weight:800;color:#f0c96a;margin-top:2px;}
+    .rc-comments{flex:1;background:#f4f7ff;border-left:4px solid #c9952a;border-radius:7px;padding:6px 10px;font-size:7.5pt;}
+    .rc-comments p{margin-bottom:3px;line-height:1.4;}
+    .rc-comments strong{color:#0f1f4b;}
+    .rc-conduct{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:6px;}
+    .rc-conduct-item{border:1px solid #dde3f0;border-radius:5px;padding:4px 6px;font-size:7pt;}
+    .rc-conduct-label{color:#6b7497;font-size:6pt;text-transform:uppercase;letter-spacing:0.4px;font-weight:700;}
+    .rc-conduct-val{font-weight:800;color:#0f1f4b;margin-top:1px;font-size:8pt;}
+    .rc-grade-key{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;}
+    .rc-gk-item{display:flex;align-items:center;gap:3px;font-size:6.5pt;background:#f7f9ff;border:1px solid #e2e8f0;border-radius:4px;padding:2px 6px;}
+    .rc-gk-dot{width:7px;height:7px;border-radius:50%;}
+    .rc-sigs{display:flex;justify-content:space-between;margin-top:8px;}
+    .rc-sig{text-align:center;flex:1;}
+    .rc-sig-line{border-bottom:1.5px solid #0f1f4b;margin:0 7px 3px;height:20px;}
+    .rc-sig-lbl{font-size:6.5pt;font-weight:700;color:#6b7497;text-transform:uppercase;letter-spacing:0.4px;}
+    .rc-bottombar{height:5px;background:linear-gradient(90deg,#c9952a,#0f1f4b,#c9952a);border-radius:4px;margin-top:7px;}
+    .rc-stamp{position:absolute;bottom:24mm;right:13mm;width:58px;height:58px;border-radius:50%;border:3px solid rgba(15,31,75,0.13);display:flex;align-items:center;justify-content:center;font-size:6.5px;color:rgba(15,31,75,0.13);text-align:center;font-weight:700;text-transform:uppercase;letter-spacing:1px;line-height:1.3;transform:rotate(-15deg);}
+    .rc-nextterm{border:1px solid #dde3f0;border-radius:6px;padding:5px 9px;font-size:7.5pt;margin-top:5px;display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+    .rc-nextterm-title{grid-column:1/-1;font-weight:800;color:#0f1f4b;font-size:7pt;text-transform:uppercase;letter-spacing:0.6px;}
+    .rc-nextterm-field label{font-size:6pt;color:#6b7497;font-weight:700;text-transform:uppercase;}
+    .rc-nextterm-field span{border-bottom:1px solid #aaa;display:block;min-height:12px;margin-top:1px;font-size:8pt;font-weight:700;color:#0f1f4b;}
+    @media print{@page{size:A4 portrait;margin:0;}.a4-page{border:none;box-shadow:none;page-break-after:always;}}
+  </style></head><body>${allHTML}<script>window.onload=()=>window.print();<\/script></body></html>`);
+  win.document.close();
+}
+
+/* ════════ DOWNLOAD PDF ════════ */
+async function downloadPDF(){
+  const page=document.querySelector('.a4-page');
+  if(!page){alert('Please generate a report first.');return;}
+  const btn=document.getElementById('downloadBtn');
+  btn.textContent='⏳ Generating…';btn.disabled=true;
+  try{
+    const{jsPDF}=window.jspdf;
+    const canvas=await html2canvas(page,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff',width:page.scrollWidth,height:page.scrollHeight});
+    const imgData=canvas.toDataURL('image/jpeg',0.97);
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    pdf.addImage(imgData,'JPEG',0,0,pdf.internal.pageSize.getWidth(),pdf.internal.pageSize.getHeight());
+    const sel=document.getElementById('reportStudent');
+    const sName=sel.options[sel.selectedIndex]?.text.replace(/\s*\(.*\)/,'').trim()||'Report';
+    const term=document.getElementById('reportTerm').value;
+    const year=document.getElementById('reportYear').value||new Date().getFullYear();
+    pdf.save(`${sName}_Term${term}_${year}_ReportCard.pdf`);
+  }catch(err){alert('PDF failed: '+err.message);}
+  btn.textContent='⬇️ Download PDF';btn.disabled=false;
+}
+
+/* ════════ ADMIN MARKS TABLE ════════ */
+async function renderAdminMarks(){
+  const search=(document.getElementById('marksSearch')?.value||'').toLowerCase();
+  const classF=document.getElementById('marksClassFilter')?.value||'';
+  const termF=document.getElementById('marksTermFilter')?.value||'';
+  const [students,allMarks]=await Promise.all([idbGetAll('students'),idbGetAll('marks')]);
+  const studentMap=Object.fromEntries(students.map(s=>[s.id,s]));
+  let filtered=allMarks.filter(mark=>{
+    const learner=studentMap[mark.studentId];
+    const t=(learner?.name||'').toLowerCase().includes(search)||mark.subject.toLowerCase().includes(search);
+    const c=!classF||(learner?.className===classF);
+    const tr=!termF||String(mark.term)===String(termF);
+    return t&&c&&tr;
+  }).sort((a,b)=>{
+    const na=studentMap[a.studentId]?.name||'';
+    const nb=studentMap[b.studentId]?.name||'';
+    return na.localeCompare(nb)||a.subject.localeCompare(b.subject);
+  });
+  const total=filtered.length;
+  const totalPages=Math.max(1,Math.ceil(total/PER_PAGE));
+  if(marksPage>totalPages)marksPage=totalPages;
+  const slice=filtered.slice((marksPage-1)*PER_PAGE,marksPage*PER_PAGE);
+  const body=document.querySelector('#adminMarksTable tbody');if(!body)return;
+  body.innerHTML='';
+  if(!slice.length){
+    body.innerHTML='<tr class="empty-row"><td colspan="14">No marks found. Teachers must save marks from the Teacher Portal.</td></tr>';
+  } else {
+    slice.forEach(mark=>{
+      const learner=studentMap[mark.studentId];
+      const grade=getGrade(mark.total);
+      const actS=Number(mark.actScaled||((Number(mark.a1)+Number(mark.a2)+Number(mark.a3))/9*20)).toFixed(1);
+      body.innerHTML+=`<tr>
+        <td><strong>${learner?learner.name:'—'}</strong></td>
+        <td><span class="badge badge-navy">${learner?learner.className:'—'}</span></td>
+        <td><span style="font-weight:700;color:var(--navy)">T${mark.term||'?'}</span></td>
+        <td>${mark.subject}</td>
+        <td>${mark.a1}</td><td>${mark.a2}</td><td>${mark.a3}</td>
+        <td style="font-weight:600;color:var(--navy-mid)">${actS}</td>
+        <td>${mark.exam}</td>
+        <td style="font-weight:700">${mark.total}</td>
+        <td><span class="badge ${gradeBadgeClass(grade)}">${grade}</span></td>
+        <td style="font-size:11px;font-style:italic;color:${gradeColor(grade)}">${getComment(grade)}</td>
+        <td style="font-size:11px;color:var(--muted)">${mark.teacher}</td>
+        <td><button class="btn btn-danger btn-xs" onclick="deleteMark('${mark._key}')">🗑</button></td>
+      </tr>`;
+    });
+  }
+  renderPagination('marksPagination',marksPage,totalPages,total,'marksPage','renderAdminMarks');
+}
+
+async function deleteMark(key){
+  if(!confirm('Delete this mark entry? This cannot be undone.'))return;
+  await idbDelete('marks',key);
+  await renderAdminMarks();await renderStats();
+  showAlert('transferAlert','Mark entry deleted.','error');
+}
+
+/* ════════ ANALYTICS ════════ */
+async function renderAnalytics(){
+  const classF=document.getElementById('analyticsClass')?.value||'';
+  const termF=document.getElementById('analyticsTerm')?.value||'';
+  const [allMarks,allStudents]=await Promise.all([idbGetAll('marks'),idbGetAll('students')]);
+  const studentMap=Object.fromEntries(allStudents.map(s=>[s.id,s]));
+  let marks=allMarks.filter(m=>{
+    const s=studentMap[m.studentId];
+    const c=!classF||(s?.className===classF);
+    const t=!termF||String(m.term)===String(termF);
+    return c&&t;
+  });
+  if(!marks.length){document.getElementById('analyticsOutput').innerHTML='<div class="warn-note">No marks found for the selected filters.</div>';return;}
+
+  // Grade distribution
+  const gradeCounts={A:0,B:0,C:0,D:0,E:0};
+  marks.forEach(m=>gradeCounts[getGrade(m.total)]++);
+  const totalM=marks.length;
+
+  // Subject averages
+  const subjectMap={};
+  marks.forEach(m=>{
+    if(!subjectMap[m.subject])subjectMap[m.subject]={sum:0,count:0};
+    subjectMap[m.subject].sum+=Number(m.total);
+    subjectMap[m.subject].count++;
+  });
+  const subjectAvgs=Object.entries(subjectMap).map(([s,v])=>({subject:s,avg:(v.sum/v.count).toFixed(1),count:v.count})).sort((a,b)=>b.avg-a.avg);
+
+  // Pass rate
+  const passCount=marks.filter(m=>Number(m.total)>=45).length;
+  const passRate=Math.round(passCount/totalM*100);
+
+  // Overall avg
+  const overallAvg=(marks.reduce((a,m)=>a+Number(m.total),0)/totalM).toFixed(1);
+
+  const gradeColors={A:'#16a34a',B:'#1d4ed8',C:'#d97706',D:'#ea580c',E:'#dc2626'};
+
+  document.getElementById('analyticsOutput').innerHTML=`
+    <div class="grid-4" style="margin-bottom:20px">
+      <div class="stat-card"><div class="stat-icon blue">📝</div><div><div class="stat-val">${totalM}</div><div class="stat-lbl">Total Mark Entries</div></div></div>
+      <div class="stat-card"><div class="stat-icon green">📊</div><div><div class="stat-val">${overallAvg}</div><div class="stat-lbl">Overall Average</div></div></div>
+      <div class="stat-card"><div class="stat-icon ${passRate>=50?'green':'red'}">✅</div><div><div class="stat-val">${passRate}%</div><div class="stat-lbl">Pass Rate (≥45)</div></div></div>
+      <div class="stat-card"><div class="stat-icon gold">🏆</div><div><div class="stat-val">${gradeCounts.A}</div><div class="stat-lbl">Grade A (Accomplished)</div></div></div>
+    </div>
+    <div class="grid-2">
+      <div>
+        <div style="font-weight:700;color:var(--navy);margin-bottom:12px;font-size:14px">📊 Grade Distribution</div>
+        <div class="chart-bar-wrap">
+          ${Object.entries(gradeCounts).map(([g,n])=>`
+            <div class="chart-bar-row">
+              <div class="chart-bar-label"><span class="badge badge-${g.toLowerCase()}">${g}</span> ${getComment(g)}</div>
+              <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${totalM?Math.round(n/totalM*100):0}%;background:${gradeColors[g]}">${totalM&&n?Math.round(n/totalM*100)+'%':''}</div></div>
+              <div class="chart-bar-count">${n}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div>
+        <div style="font-weight:700;color:var(--navy);margin-bottom:12px;font-size:14px">📚 Subject Averages (Top 10)</div>
+        <div class="chart-bar-wrap">
+          ${subjectAvgs.slice(0,10).map(s=>`
+            <div class="chart-bar-row">
+              <div class="chart-bar-label" style="font-size:11px;min-width:130px" title="${s.subject}">${s.subject.length>18?s.subject.substring(0,17)+'…':s.subject}</div>
+              <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${s.avg}%;background:${gradeColors[getGrade(s.avg)]}">${s.avg}</div></div>
+              <div class="chart-bar-count" style="font-size:11px">${s.count}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ════════ PRINT MARKSHEET ════════ */
+function printMarksheet(){
+  document.body.classList.add('printing-marksheet');
+  window.print();
+  setTimeout(()=>document.body.classList.remove('printing-marksheet'),1000);
+}
+
+async function downloadMarksheet(){
+  const allBtns=document.querySelectorAll('#teacher-sheet .btn');
+  const gradeKey=document.querySelector('#teacher-sheet .grade-key');
+  const infoNote=document.querySelector('#teacher-sheet .info-note');
+  const marksAlert=document.getElementById('marksAlert');
+  const transferAlert=document.getElementById('marksheetTransferAlert');
+  allBtns.forEach(b=>b.style.visibility='hidden');
+  if(gradeKey)gradeKey.style.display='none';
+  if(infoNote)infoNote.style.display='none';
+  marksAlert.classList.remove('show');
+  transferAlert.classList.remove('show');
+  try{
+    const card=document.querySelector('#teacher-sheet .card');
+    const{jsPDF}=window.jspdf;
+    const canvas=await html2canvas(card,{scale:2,useCORS:true,backgroundColor:'#ffffff',width:card.scrollWidth,height:card.scrollHeight});
+    const imgData=canvas.toDataURL('image/jpeg',0.95);
+    const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    const pw=pdf.internal.pageSize.getWidth();
+    const ph=pdf.internal.pageSize.getHeight();
+    const imgW=pw;
+    const imgH=(canvas.height*pw)/canvas.width;
+    const finalW=imgH>ph?(canvas.width*ph)/canvas.height:imgW;
+    const finalH=imgH>ph?ph:imgH;
+    const offsetX=(pw-finalW)/2;
+    const offsetY=(ph-finalH)/2;
+    pdf.addImage(imgData,'JPEG',offsetX,offsetY,finalW,finalH);
+    pdf.save(`Marksheet_${currentSubject}_${currentClass}_Term${currentTerm}.pdf`);
+  }catch(err){alert('Download failed: '+err.message);}
+  allBtns.forEach(b=>b.style.visibility='');
+  if(gradeKey)gradeKey.style.display='';
+  if(infoNote)infoNote.style.display='';
+}
+
+/* ════════ EXPORT TO EXCEL ════════ */
+async function exportExcel(mode='all'){
+  const [students,marks]=await Promise.all([idbGetAll('students'),idbGetAll('marks')]);
+  const wb=XLSX.utils.book_new();
+  if(mode==='all'||mode==='students'){
+    const sRows=students.map(s=>({'Learner ID':s.id,'Full Name':s.name,'Class':s.className,'Has Photo':s.photo?'Yes':'No','_photo':s.photo||''}));
+    const ws=XLSX.utils.json_to_sheet(sRows);
+    ws['!cols']=[{wch:12},{wch:30},{wch:14},{wch:10},{wch:0}];
+    XLSX.utils.book_append_sheet(wb,ws,'Learners');
+  }
+  if(mode==='all'||mode==='marks'){
+    const studentMap=Object.fromEntries(students.map(s=>[s.id,s]));
+    const mRows=marks.map(m=>({
+      'Learner ID':m.studentId,'Learner Name':studentMap[m.studentId]?.name||'',
+      'Class':studentMap[m.studentId]?.className||'','Term':m.term||1,'Subject':m.subject,
+      'A1 /3':m.a1,'A2 /3':m.a2,'A3 /3':m.a3,
+      'Activities /20':m.actScaled||Number(((Number(m.a1)+Number(m.a2)+Number(m.a3))/9*20).toFixed(1)),
+      'End Term /80':m.exam,'Total /100':m.total,
+      'Grade':getGrade(m.total),'Comment':getComment(getGrade(m.total)),'Teacher':m.teacher
+    }));
+    const ws2=XLSX.utils.json_to_sheet(mRows);
+    ws2['!cols']=[{wch:12},{wch:28},{wch:14},{wch:7},{wch:28},{wch:7},{wch:7},{wch:7},{wch:13},{wch:13},{wch:11},{wch:7},{wch:14},{wch:22}];
+    XLSX.utils.book_append_sheet(wb,ws2,'Marks');
+  }
+  const meta=[{'System':'SchoolPro Manager','Version':'4.0','Exported':new Date().toLocaleString()}];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(meta),'_meta');
+  const label=mode==='students'?'Learners':mode==='marks'?'Marks':'All_Data';
+  const date=new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb,`SchoolPro_${label}_${date}.xlsx`);
+  showAlert('transferAlert',`✅ Export complete — SchoolPro_${label}_${date}.xlsx downloaded.`);
+}
+
+/* ════════ IMPORT FROM EXCEL ════════ */
+async function importExcel(){
+  const file=document.getElementById('importFile').files[0];
+  if(!file){showAlert('transferAlert','Please select an Excel file to import.','error');return;}
+  const progress=document.getElementById('importProgress');
+  const bar=document.getElementById('importBar');
+  const status=document.getElementById('importStatus');
+  progress.style.display='block';bar.style.width='0%';
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      if(!wb.SheetNames.includes('_meta')){
+        showAlert('transferAlert','This file was not exported from SchoolPro Manager.','error');
+        progress.style.display='none';return;
+      }
+      let addedStudents=0,skippedStudents=0,addedMarks=0,skippedMarks=0;
+      if(wb.SheetNames.includes('Learners')){
+        status.textContent='Importing learners…';bar.style.width='20%';
+        const rows=XLSX.utils.sheet_to_json(wb.Sheets['Learners']);
+        for(const row of rows){
+          const id=(row['Learner ID']||'').toString().trim().toUpperCase();
+          const name=(row['Full Name']||'').toString().trim();
+          const cls=(row['Class']||'').toString().trim();
+          if(!id||!name)continue;
+          const existing=await idbGet('students',id);
+          if(existing){skippedStudents++;continue;}
+          await idbPut('students',{id,name,className:cls,photo:row['_photo']||''});
+          addedStudents++;
+        }
+        bar.style.width='50%';
+      }
+      if(wb.SheetNames.includes('Marks')){
+        status.textContent='Importing marks…';bar.style.width='60%';
+        const rows=XLSX.utils.sheet_to_json(wb.Sheets['Marks']);
+        for(const row of rows){
+          const studentId=(row['Learner ID']||'').toString().trim().toUpperCase();
+          const subject=(row['Subject']||'').toString().trim();
+          const term=Number(row['Term']||1);
+          if(!studentId||!subject)continue;
+          const key=`${studentId}:${subject}:${term}`;
+          const existing=await idbGet('marks',key);
+          if(existing){skippedMarks++;continue;}
+          const student=await idbGet('students',studentId);
+          const a1=Number(row['A1 /3']||0);
+          const a2=Number(row['A2 /3']||0);
+          const a3=Number(row['A3 /3']||0);
+          const exam=Number(row['End Term /80']||0);
+          const actScaled=Number(((a1+a2+a3)/9*20).toFixed(1));
+          const total=String((actScaled+exam).toFixed(1));
+          await idbPut('marks',{
+            _key:key,studentId,subject,
+            className:student?.className||(row['Class']||''),
+            teacher:(row['Teacher']||'').toString(),
+            term,a1,a2,a3,exam,actScaled,total
+          });
+          addedMarks++;
+        }
+        bar.style.width='90%';
+      }
+      bar.style.width='100%';status.textContent='Done!';
+      setTimeout(()=>progress.style.display='none',2000);
+      await renderStats();await renderLearnerTable();await renderAdminMarks();await loadReportStudents();await populateClassFilters();
+      document.getElementById('importFile').value='';
+      showAlert('transferAlert',`✅ Import complete — Added ${addedStudents} learner(s), ${addedMarks} mark record(s). Skipped ${skippedStudents+skippedMarks} existing.`);
+    }catch(err){
+      progress.style.display='none';
+      showAlert('transferAlert','Import failed: '+err.message,'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ════════ EXPORT MARKSHEET TO EXCEL ════════ */
+async function exportMarksheetExcel(){
+  if(!currentTeacherObj){showAlert('marksheetTransferAlert','Please log in as a teacher first.','error');return;}
+  const students=await idbGetByIndex('students','className',currentClass);
+  students.sort((a,b)=>a.name.localeCompare(b.name));
+  const allMarks=await idbGetAll('marks');
+  const rows=students.map(student=>{
+    const ex=allMarks.find(m=>m._key===`${student.id}:${currentSubject}:${currentTerm}:${currentYear}`)
+      ||allMarks.find(m=>m._key===`${student.id}:${currentSubject}:${currentTerm}`&&!m.year);
+    const a1=ex?ex.a1:'',a2=ex?ex.a2:'',a3=ex?ex.a3:'',exam=ex?ex.exam:'';
+    const actS=ex?ex.actScaled:'',total=ex?ex.total:'';
+    const grade=ex?getGrade(ex.total):'';
+    return{'Learner ID':student.id,'Full Name':student.name,'Class':student.className,'Term':currentTerm,'Subject':currentSubject,'A1 /3':a1,'A2 /3':a2,'A3 /3':a3,'Activities /20':actS,'End Term /80':exam,'Total /100':total,'Grade':grade,'Comment':grade?getComment(grade):'','Teacher':currentTeacherObj.name};
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:12},{wch:28},{wch:14},{wch:7},{wch:28},{wch:7},{wch:7},{wch:7},{wch:13},{wch:13},{wch:11},{wch:7},{wch:14},{wch:22}];
+  XLSX.utils.book_append_sheet(wb,ws,'Marksheet');
+  const meta=[{'System':'SchoolPro Manager','Type':'Marksheet','Subject':currentSubject,'Class':currentClass,'Term':currentTerm,'Year':currentYear,'Teacher':currentTeacherObj.name,'Exported':new Date().toLocaleString(),'Version':'4.0'}];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(meta),'_meta');
+  const safeSubject=currentSubject.replace(/[^a-z0-9]/gi,'_').substring(0,24);
+  const safeClass=currentClass.replace(/[^a-z0-9]/gi,'_');
+  const date=new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb,`Marksheet_${safeClass}_${safeSubject}_T${currentTerm}_${date}.xlsx`);
+  showAlert('marksheetTransferAlert',`✅ Exported marksheet for ${currentClass} — ${currentSubject} — Term ${currentTerm}.`);
+}
+
+/* ════════ IMPORT MARKSHEET FROM EXCEL ════════ */
+async function importMarksheetExcel(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      if(!wb.SheetNames.includes('_meta')){showAlert('marksheetTransferAlert','Not a SchoolPro export file.','error');input.value='';return;}
+      if(wb.SheetNames.includes('_meta')){
+        const metaRows=XLSX.utils.sheet_to_json(wb.Sheets['_meta']);
+        if(metaRows.length){
+          const m=metaRows[0];
+          if(m.Subject&&m.Subject!==currentSubject){if(!confirm(`⚠️ File is for "${m.Subject}" but you're logged in for "${currentSubject}".\n\nImport anyway?`)){input.value='';return;}}
+          if(m.Class&&m.Class!==currentClass){if(!confirm(`⚠️ File is for class "${m.Class}" but you're logged in for "${currentClass}".\n\nImport anyway?`)){input.value='';return;}}
+          if(m.Term&&Number(m.Term)!==currentTerm){if(!confirm(`⚠️ File is for Term ${m.Term} but you're viewing Term ${currentTerm}.\n\nImport anyway?`)){input.value='';return;}}
+          if(m.Year&&String(m.Year)!==String(currentYear)){if(!confirm(`⚠️ File is for year ${m.Year} but current year is ${currentYear}.\n\nImport anyway?`)){input.value='';return;}}
+        }
+      }
+      if(!wb.SheetNames.includes('Marksheet')){showAlert('marksheetTransferAlert','No Marksheet sheet found.','error');input.value='';return;}
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets['Marksheet']);
+      const tableRows=document.querySelectorAll('#classTable tbody tr');
+      const rowMap={};
+      tableRows.forEach(row=>{const idEl=row.querySelector('.studentId');if(idEl)rowMap[idEl.value]=row;});
+      let filled=0,skipped=0;
+      for(const dataRow of rows){
+        const id=(dataRow['Learner ID']||'').toString().trim().toUpperCase();
+        const tr=rowMap[id];
+        if(!tr){skipped++;continue;}
+        const a1=dataRow['A1 /3']!==undefined?Number(dataRow['A1 /3']):null;
+        const a2=dataRow['A2 /3']!==undefined?Number(dataRow['A2 /3']):null;
+        const a3=dataRow['A3 /3']!==undefined?Number(dataRow['A3 /3']):null;
+        const exam=dataRow['End Term /80']!==undefined?Number(dataRow['End Term /80']):null;
+        if(a1!==null){const inp=tr.querySelector('.a1');if(inp)inp.value=Math.min(3,Math.max(0,a1));}
+        if(a2!==null){const inp=tr.querySelector('.a2');if(inp)inp.value=Math.min(3,Math.max(0,a2));}
+        if(a3!==null){const inp=tr.querySelector('.a3');if(inp)inp.value=Math.min(3,Math.max(0,a3));}
+        if(exam!==null){const inp=tr.querySelector('.exam');if(inp)inp.value=Math.min(80,Math.max(0,exam));}
+        liveRow(tr);
+        filled++;
+      }
+      input.value='';
+      showAlert('marksheetTransferAlert',`✅ Imported ${filled} row(s)${skipped?' ('+skipped+' not in this class)':''}. Click 💾 Save Marks to commit.`);
+    }catch(err){input.value='';showAlert('marksheetTransferAlert','Import failed: '+err.message,'error');}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ════════ UNSAVED MARKS GUARD ════════ */
+function backFromMarksheet(){
+  if(marksUnsaved){
+    if(!confirm('⚠️ You have unsaved marks. Go back without saving?\n\nClick Cancel to stay and save first.'))return;
+  }
+  marksUnsaved=false;
+  switchPage('teacher-dashboard');
+}
+
+/* ════════ TEACHER CONDUCT MODAL ════════ */
+async function openTeacherConductModal(){
+  // Teachers enter conduct for all learners in their current class
+  const students=await idbGetByIndex('students','className',currentClass);
+  if(!students.length){alert('No learners in this class yet.');return;}
+  students.sort((a,b)=>a.name.localeCompare(b.name));
+
+  // Build a mini-modal dynamically
+  let rows=students.map(s=>`
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:7px 8px;font-weight:600;font-size:13px;min-width:140px">${s.name}</td>
+      <td style="padding:4px 5px"><select class="tc-punctuality" data-id="${s.id}" style="width:100%;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:6px">
+        <option value="">—</option><option>Excellent</option><option>Very Good</option><option>Good</option><option>Fair</option><option>Poor</option>
+      </select></td>
+      <td style="padding:4px 5px"><select class="tc-discipline" data-id="${s.id}" style="width:100%;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:6px">
+        <option value="">—</option><option>Excellent</option><option>Very Good</option><option>Good</option><option>Fair</option><option>Poor</option>
+      </select></td>
+      <td style="padding:4px 5px"><input class="tc-present" data-id="${s.id}" type="number" min="0" placeholder="Days" style="width:62px;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:6px"></td>
+      <td style="padding:4px 5px"><input class="tc-total" data-id="${s.id}" type="number" min="0" placeholder="Total" style="width:62px;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:6px"></td>
+      <td style="padding:4px 5px"><input class="tc-remark" data-id="${s.id}" type="text" placeholder="Teacher remark…" style="width:100%;min-width:160px;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:6px"></td>
+    </tr>`).join('');
+
+  // Pre-fill saved values
+  for(const s of students){
+    const c=await idbGet('conduct',`${s.id}:${currentTerm}:${currentYear}`)||await idbGet('conduct',`${s.id}:${currentTerm}`)||{};
+    document.querySelectorAll(`[data-id="${s.id}"]`);
+    // Store for after DOM insertion
+    s._conduct=c;
+  }
+
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(15,31,75,0.6);z-index:600;display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.innerHTML=`
+    <div style="background:#fff;border-radius:18px;padding:24px;max-width:900px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(15,31,75,0.2)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--navy);font-weight:700">📝 Conduct & Attendance — ${currentClass} · Term ${currentTerm} (${currentYear})</div>
+        <button onclick="this.closest('[style]').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)">✕</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="background:var(--navy)">
+            <th style="color:#fff;padding:9px 8px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase">Learner</th>
+            <th style="color:#fff;padding:9px 8px;font-size:11px;font-weight:700;text-transform:uppercase">Punctuality</th>
+            <th style="color:#fff;padding:9px 8px;font-size:11px;font-weight:700;text-transform:uppercase">Discipline</th>
+            <th style="color:#fff;padding:9px 8px;font-size:11px;font-weight:700;text-transform:uppercase">Present</th>
+            <th style="color:#fff;padding:9px 8px;font-size:11px;font-weight:700;text-transform:uppercase">Total Days</th>
+            <th style="color:#fff;padding:9px 8px;font-size:11px;font-weight:700;text-transform:uppercase">Teacher Remark</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:9px;margin-top:16px;justify-content:flex-end">
+        <button onclick="this.closest('[style]').remove()" style="padding:9px 18px;border:1.5px solid var(--border);border-radius:9px;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+        <button id="saveTeacherConductBtn" style="padding:9px 22px;background:var(--navy);color:#fff;border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer">💾 Save All Conduct</button>
+      </div>
+      <div id="teacherConductAlert" style="margin-top:10px;display:none;padding:10px 14px;border-radius:8px;font-size:13px"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  // Pre-fill after DOM insertion
+  for(const s of students){
+    const c=s._conduct||{};
+    const pEl=overlay.querySelector(`.tc-punctuality[data-id="${s.id}"]`);
+    const dEl=overlay.querySelector(`.tc-discipline[data-id="${s.id}"]`);
+    const prEl=overlay.querySelector(`.tc-present[data-id="${s.id}"]`);
+    const tEl=overlay.querySelector(`.tc-total[data-id="${s.id}"]`);
+    const rEl=overlay.querySelector(`.tc-remark[data-id="${s.id}"]`);
+    if(pEl&&c.punctuality)pEl.value=c.punctuality;
+    if(dEl&&c.discipline)dEl.value=c.discipline;
+    if(prEl&&c.daysPresent)prEl.value=c.daysPresent;
+    if(tEl&&c.daysTotal)tEl.value=c.daysTotal;
+    if(rEl&&c.teacherRemark)rEl.value=c.teacherRemark;
+  }
+
+  overlay.querySelector('#saveTeacherConductBtn').onclick=async()=>{
+    let saved=0;
+    for(const s of students){
+      const pEl=overlay.querySelector(`.tc-punctuality[data-id="${s.id}"]`);
+      const dEl=overlay.querySelector(`.tc-discipline[data-id="${s.id}"]`);
+      const prEl=overlay.querySelector(`.tc-present[data-id="${s.id}"]`);
+      const tEl=overlay.querySelector(`.tc-total[data-id="${s.id}"]`);
+      const rEl=overlay.querySelector(`.tc-remark[data-id="${s.id}"]`);
+      const existing=await idbGet('conduct',`${s.id}:${currentTerm}:${currentYear}`)||{};
+      await idbPut('conduct',{
+        _key:`${s.id}:${currentTerm}:${currentYear}`,
+        studentId:s.id,term:currentTerm,year:currentYear,
+        punctuality:pEl?pEl.value:existing.punctuality||'',
+        discipline:dEl?dEl.value:existing.discipline||'',
+        daysPresent:prEl?prEl.value:existing.daysPresent||'',
+        daysTotal:tEl?tEl.value:existing.daysTotal||'',
+        teacherRemark:rEl?rEl.value.trim():existing.teacherRemark||'',
+        htRemark:existing.htRemark||''
+      });
+      saved++;
+    }
+    const al=overlay.querySelector('#teacherConductAlert');
+    al.style.display='block';al.style.background='#f0fdf4';al.style.color='#166534';al.style.border='1px solid #bbf7d0';
+    al.textContent=`✅ Conduct saved for ${saved} learner(s).`;
+    setTimeout(()=>overlay.remove(),1800);
+  };
+}
+
+/* ════════ PARENT ACCOUNTS — ADMIN CRUD ════════ */
+let currentParentObj = null;
+let parentTerm = 1;
+
+function openAddParentModal(){
+  document.getElementById('newParentName').value='';
+  document.getElementById('newParentUsername').value='';
+  document.getElementById('newParentPw').value='';
+  document.getElementById('newParentChildIds').value='';
+  document.getElementById('parentChildPreview').style.display='none';
+  document.getElementById('parentChildPreviewList').innerHTML='';
+  openModal('addParentModal');
+}
+
+async function previewParentChildren(){
+  const raw=document.getElementById('newParentChildIds').value;
+  const ids=raw.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean);
+  const wrap=document.getElementById('parentChildPreview');
+  const list=document.getElementById('parentChildPreviewList');
+  if(!ids.length){list.innerHTML='';wrap.style.display='none';return;}
+  let html='';
+  for(const id of ids){
+    const s=await idbGet('students',id);
+    if(s) html+=`<div style="display:flex;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:7px;padding:6px 11px;margin-bottom:5px;font-size:13px">
+      ${s.photo?`<img src="${s.photo}" style="width:28px;height:34px;object-fit:cover;border-radius:4px;border:1.5px solid var(--navy)">`:'<span style="font-size:18px">🧑</span>'}
+      <div><strong style="color:var(--navy)">${s.name}</strong> <span style="color:var(--muted);font-size:12px">(${s.id} · ${s.className})</span></div>
+      <span style="margin-left:auto;color:#166534;font-weight:700;font-size:11px">✅ Found</span></div>`;
+    else html+=`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:7px;padding:6px 11px;margin-bottom:5px;font-size:13px;color:var(--red)">❌ ID <strong>${id}</strong> — not found</div>`;
+  }
+  list.innerHTML=html;
+  wrap.style.display='block';
+}
+
+async function saveNewParent(){
+  const name=document.getElementById('newParentName').value.trim();
+  const username=document.getElementById('newParentUsername').value.trim().toLowerCase().replace(/\s+/g,'.');
+  const pw=document.getElementById('newParentPw').value;
+  const raw=document.getElementById('newParentChildIds').value;
+  const childIds=raw.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean);
+  if(!name||!username||!pw){showAlert('addParentAlert','Please fill in name, username and password.','error');return;}
+  if(pw.length<6){showAlert('addParentAlert','Password must be at least 6 characters.','error');return;}
+  if(!childIds.length){showAlert('addParentAlert','Please enter at least one Learner ID.','error');return;}
+  const existing=await idbGet('parents',username);
+  if(existing){showAlert('addParentAlert','A parent with that username already exists.','error');return;}
+  // Validate at least one child exists
+  let foundCount=0;
+  for(const id of childIds){const s=await idbGet('students',id);if(s)foundCount++;}
+  if(!foundCount){showAlert('addParentAlert','None of the Learner IDs were found. Please check and try again.','error');return;}
+  const pwHash=await hashPw(pw);
+  await idbPut('parents',{username,name,pwHash,childIds});
+  closeModal('addParentModal');
+  await renderParentList();
+  showAlert('transferAlert',`✅ Parent account "${name}" (${username}) created for ${foundCount} learner(s).`);
+}
+
+async function openEditParent(username){
+  const parent=await idbGet('parents',username);if(!parent)return;
+  document.getElementById('editParentOrigUsername').value=username;
+  document.getElementById('editParentName').value=parent.name;
+  document.getElementById('editParentPw').value='';
+  document.getElementById('editParentChildIds').value=(parent.childIds||[]).join(', ');
+  openModal('editParentModal');
+}
+
+async function saveEditParent(){
+  const origUsername=document.getElementById('editParentOrigUsername').value;
+  const newName=document.getElementById('editParentName').value.trim();
+  const newPw=document.getElementById('editParentPw').value;
+  const raw=document.getElementById('editParentChildIds').value;
+  const childIds=raw.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean);
+  if(!newName){showAlert('editParentAlert','Name is required.','error');return;}
+  if(!childIds.length){showAlert('editParentAlert','At least one Learner ID is required.','error');return;}
+  const parent=await idbGet('parents',origUsername);
+  if(!parent){showAlert('editParentAlert','Account not found.','error');return;}
+  if(newPw&&newPw.length<6){showAlert('editParentAlert','New password must be at least 6 characters.','error');return;}
+  const updatedParent={...parent,name:newName,childIds};
+  if(newPw)updatedParent.pwHash=await hashPw(newPw);
+  await idbPut('parents',updatedParent);
+  closeModal('editParentModal');
+  await renderParentList();
+  showAlert('transferAlert',`✅ Parent account "${newName}" updated.`);
+}
+
+async function deleteParent(username){
+  if(!confirm(`Delete parent account "${username}"? This cannot be undone.`))return;
+  await idbDelete('parents',username);
+  await renderParentList();
+}
+
+async function renderParentList(){
+  const parents=await idbGetAll('parents');
+  const el=document.getElementById('parentList');if(!el)return;
+  if(!parents.length){
+    el.innerHTML='<div class="warn-note">⚠️ No parent accounts yet. Create accounts so parents can log in and view their children\'s report cards.</div>';
+    return;
+  }
+  // Load student names for display
+  const allStudents=await idbGetAll('students');
+  const studentMap=Object.fromEntries(allStudents.map(s=>[s.id,s]));
+  el.innerHTML=parents.map(p=>{
+    const childNames=(p.childIds||[]).map(id=>{
+      const s=studentMap[id];
+      return s?`<span style="display:inline-flex;align-items:center;gap:4px;background:#e8effe;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;color:var(--navy);margin:2px">${s.name} <span style="color:var(--muted)">(${s.id})</span></span>`
+               :`<span style="background:#fef2f2;color:var(--red);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;margin:2px">${id} — not found</span>`;
+    }).join('');
+    return `<div class="teacher-card" style="flex-direction:column;align-items:flex-start;gap:8px">
+      <div style="display:flex;width:100%;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div class="teacher-info">
+          <div class="teacher-name">👨‍👩‍👧 ${p.name}</div>
+          <div class="teacher-meta">Username: <strong>${p.username}</strong></div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-xs" onclick="openEditParent('${p.username}')">✏️ Edit</button>
+          <button class="btn btn-danger btn-xs" onclick="deleteParent('${p.username}')">🗑 Delete</button>
+        </div>
+      </div>
+      <div style="width:100%"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Linked Children</div>
+      <div style="flex-wrap:wrap;display:flex">${childNames||'<span style="color:var(--muted);font-size:12px">No children linked</span>'}</div></div>
+    </div>`;
+  }).join('');
+}
+
+/* ════════ PARENT LOGIN ════════ */
+async function parentLogin(){
+  const username=document.getElementById('parentUsername').value.trim().toLowerCase();
+  const pw=document.getElementById('parentLoginPw').value;
+  if(!username||!pw){showAlert('parentLoginAlert','Please enter your username and password.','error');return;}
+  const parent=await idbGet('parents',username);
+  if(!parent){showAlert('parentLoginAlert','Incorrect username or password. Please contact the school admin.','error');return;}
+  const ok=(await hashPw(pw))===parent.pwHash;
+  if(!ok){showAlert('parentLoginAlert','Incorrect username or password.','error');return;}
+  currentParentObj=parent;
+  parentTerm=1;
+  // Set academic year from school info
+  const info=await idbGet('school','info')||{};
+  const yearEl=document.getElementById('parentReportYear');
+  yearEl.value=info.academicYear||String(new Date().getFullYear());
+  // Reset term pills
+  document.querySelectorAll('#parentTermPills .term-pill').forEach((p,i)=>{
+    p.classList.toggle('active',i===0);
+  });
+  // Welcome message
+  const allStudents=await idbGetAll('students');
+  const studentMap=Object.fromEntries(allStudents.map(s=>[s.id,s]));
+  const childNames=(parent.childIds||[]).map(id=>studentMap[id]?.name||id).join(', ');
+  document.getElementById('parentWelcome').textContent=`Welcome, ${parent.name}`;
+  document.getElementById('parentChildInfo').textContent=`Viewing progress for: ${childNames||'No children linked'}`;
+  document.getElementById('parentReportOutput').innerHTML='';
+  document.getElementById('parentDownloadWrap').style.display='none';
+  switchPage('parent-dashboard');
+  renderCircularReadList('parentCircularList');
+}
+
+function parentLogout(){
+  currentParentObj=null;
+  document.getElementById('parentUsername').value='';
+  document.getElementById('parentLoginPw').value='';
+  document.getElementById('parentReportOutput').innerHTML='';
+  switchPage('parent-gate');
+}
+
+function selectParentTermPill(term,btn){
+  parentTerm=term;
+  document.querySelectorAll('#parentTermPills .term-pill').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* ════════ PARENT REPORT VIEW ════════ */
+async function loadParentReport(){
+  if(!currentParentObj){switchPage('parent-gate');return;}
+  const year=document.getElementById('parentReportYear').value.trim()||String(new Date().getFullYear());
+  const childIds=currentParentObj.childIds||[];
+  if(!childIds.length){showAlert('parentReportAlert','No children are linked to your account. Please contact the school admin.','error');return;}
+
+  const [allStudents,allMarks,info,allConducts]=await Promise.all([
+    idbGetAll('students'),idbGetAll('marks'),
+    idbGet('school','info'),idbGetAll('conduct')
+  ]);
+  const school=info||{};
+  const studentMap=Object.fromEntries(allStudents.map(s=>[s.id,s]));
+
+  let allHTML='';
+  let found=0;
+
+  for(const childId of childIds){
+    const student=studentMap[childId];
+    if(!student){
+      allHTML+=`<div class="card" style="text-align:center;padding:24px;color:var(--muted)">⚠️ Learner ID <strong>${childId}</strong> was not found in the system. Please contact admin.</div>`;
+      continue;
+    }
+    found++;
+    const sMarks=allMarks.filter(m=>m.studentId===childId&&Number(m.term)===parentTerm);
+    const c=allConducts.find(cd=>cd.studentId===childId&&Number(cd.term)===parentTerm&&String(cd.year||'')===String(year))
+           ||allConducts.find(cd=>cd.studentId===childId&&Number(cd.term)===parentTerm)||{};
+    let totalSum=0,rows='';
+    sMarks.sort((a,b)=>a.subject.localeCompare(b.subject));
+    sMarks.forEach(mark=>{
+      totalSum+=Number(mark.total);
+      const grade=getGrade(mark.total);
+      const actS=Number(mark.actScaled||((Number(mark.a1)+Number(mark.a2)+Number(mark.a3))/9*20)).toFixed(1);
+      rows+=`<tr>
+        <td>${mark.subject}</td><td>${mark.a1}</td><td>${mark.a2}</td><td>${mark.a3}</td>
+        <td style="font-weight:700;color:#1a3270">${actS}</td>
+        <td>${mark.exam}</td>
+        <td style="font-weight:800">${mark.total}</td>
+        <td style="font-weight:800;color:${gradeColor(getGrade(mark.total))}">${getGrade(mark.total)}</td>
+        <td style="font-style:italic;color:${gradeColor(getGrade(mark.total))}">${getComment(getGrade(mark.total))}</td>
+        <td style="font-size:7pt;color:#666">${mark.teacher||''}</td>
+      </tr>`;
+    });
+    if(!rows)rows=`<tr><td colspan="10" style="text-align:center;padding:12px;color:#888;font-style:italic">No marks submitted for Term ${parentTerm} yet.</td></tr>`;
+    const finalAvg=sMarks.length?(totalSum/sMarks.length).toFixed(1):'0.0';
+    const finalGrade=getGrade(finalAvg);
+    // Class rank
+    const classStudents=allStudents.filter(s=>s.className===student.className);
+    const ranked=classStudents.map(s=>{
+      const sm=allMarks.filter(m=>m.studentId===s.id&&Number(m.term)===parentTerm);
+      return{id:s.id,avg:sm.length?(sm.reduce((a,m)=>a+Number(m.total),0)/sm.length):0};
+    }).sort((a,b)=>b.avg-a.avg);
+    const rank=ranked.findIndex(x=>x.id===childId)+1;
+    const rankStr=rank?`${rank} / ${classStudents.length}`:'—';
+    const autoTeacher=Number(finalAvg)>=80?'Excellent academic performance this term. Keep up the outstanding work!'
+      :Number(finalAvg)>=70?'Good academic progress. Continue working hard to achieve even better results.'
+      :Number(finalAvg)>=55?'Satisfactory performance. More effort and dedication is needed next term.'
+      :'Needs significant improvement. Please seek extra help and study harder next term.';
+    const autoHt=Number(finalAvg)>=70?'Well done! Continue striving for excellence in all subjects.'
+      :'More commitment to academics is required. Please work closely with your teachers.';
+    const teacherRemark=c.teacherRemark||autoTeacher;
+    const htRemark=c.htRemark||autoHt;
+    const termOrdinal=['','1st','2nd','3rd'][parentTerm]||`${parentTerm}th`;
+    const logoHtml=school.logo?`<img class="rc-logo" src="${school.logo}" alt="Badge">`:`<div class="rc-logo-placeholder">🏫</div>`;
+    const photoHtml=student.photo?`<img class="rc-passport" src="${student.photo}" alt="Photo">`:`<div class="rc-passport-placeholder"><span>🧑</span><span style="font-size:7px;color:#aaa">No Photo</span></div>`;
+    allHTML+=buildReportHTML(school,student,sMarks,rows,finalAvg,finalGrade,rankStr,classStudents.length,parentTerm,termOrdinal,year,logoHtml,photoHtml,teacherRemark,htRemark,c);
+  }
+
+  if(!found){showAlert('parentReportAlert','No linked learners found. Please contact the school admin.','error');return;}
+  document.getElementById('parentReportOutput').innerHTML=allHTML;
+  document.getElementById('parentDownloadWrap').style.display='flex';
+  document.getElementById('parentDownloadWrap').style.gap='8px';
+}
+
+async function downloadParentPDF(){
+  const pages=document.querySelectorAll('#parentReportOutput .a4-page');
+  if(!pages.length){showAlert('parentReportAlert','Please generate a report first.','error');return;}
+  const btn=document.querySelector('#parentDownloadWrap button');
+  const origText=btn.textContent;btn.textContent='⏳ Generating…';btn.disabled=true;
+  try{
+    const{jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    for(let i=0;i<pages.length;i++){
+      const canvas=await html2canvas(pages[i],{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff'});
+      const imgData=canvas.toDataURL('image/jpeg',0.97);
+      if(i>0)pdf.addPage();
+      pdf.addImage(imgData,'JPEG',0,0,pdf.internal.pageSize.getWidth(),pdf.internal.pageSize.getHeight());
+    }
+    const childIds=currentParentObj.childIds||[];
+    pdf.save(`ReportCard_Term${parentTerm}_${document.getElementById('parentReportYear').value||new Date().getFullYear()}.pdf`);
+  }catch(err){alert('PDF failed: '+err.message);}
+  btn.textContent=origText;btn.disabled=false;
+}
+
+/* ════════ CIRCULARS ════════ */
+async function publishCircular(){
+  const title=document.getElementById('circularTitle').value.trim();
+  const term=Number(document.getElementById('circularTerm').value);
+  const year=document.getElementById('circularYear').value.trim()||String(new Date().getFullYear());
+  const notes=document.getElementById('circularNotes').value.trim();
+  const fileInput=document.getElementById('circularFile');
+  const file=fileInput.files[0];
+  if(!title){showAlert('circularAlert','Please enter a title for the circular.','error');return;}
+  if(!file){showAlert('circularAlert','Please attach a file (PDF or image).','error');return;}
+
+  // Show loading state
+  const btn=document.querySelector('[onclick="publishCircular()"]');
+  const origText=btn.textContent;btn.textContent='⏳ Uploading…';btn.disabled=true;
+
+  try{
+    const fileData=await new Promise((res,rej)=>{
+      const reader=new FileReader();
+      reader.onload=e=>res(e.target.result);
+      reader.onerror=()=>rej(new Error('Could not read file'));
+      reader.readAsDataURL(file);
+    });
+    const circular={
+      title,term,year,notes,
+      fileName:file.name,
+      fileType:file.type,
+      fileData,
+      publishedAt:new Date().toISOString(),
+      publishedBy:'Admin'
+    };
+    await idbPutCircular(circular);
+    document.getElementById('circularTitle').value='';
+    document.getElementById('circularNotes').value='';
+    fileInput.value='';
+    showAlert('circularAlert',`✅ Circular "${title}" published successfully.`);
+    await renderCircularAdminList();
+  }catch(err){
+    showAlert('circularAlert','Failed to publish circular: '+err.message,'error');
+  }
+  btn.textContent=origText;btn.disabled=false;
+}
+
+async function deleteCircular(id){
+  if(!confirm('Delete this circular? This cannot be undone.'))return;
+  await idbDelete('circulars',id);
+  await renderCircularAdminList();
+  showAlert('circularAlert','Circular deleted.','error');
+}
+
+function circularTermLabel(t){return['','Term 1','Term 2','Term 3'][t]||`Term ${t}`;}
+
+function circularFileIcon(type){
+  if(type==='application/pdf')return'📄';
+  if(type.startsWith('image/'))return'🖼️';
+  return'📎';
+}
+
+function openCircularFile(dataUrl,fileName,fileType){
+  // Open in new tab
+  const win=window.open('','_blank');
+  if(fileType==='application/pdf'){
+    win.document.write(`<!DOCTYPE html><html><head><title>${fileName}</title></head><body style="margin:0;padding:0;background:#222">
+      <embed src="${dataUrl}" type="application/pdf" width="100%" height="100%" style="position:fixed;inset:0">
+      </body></html>`);
+  } else {
+    win.document.write(`<!DOCTYPE html><html><head><title>${fileName}</title></head><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh">
+      <img src="${dataUrl}" style="max-width:100%;max-height:100vh;object-fit:contain">
+      </body></html>`);
+  }
+  win.document.close();
+}
+
+function downloadCircularFile(dataUrl,fileName){
+  const a=document.createElement('a');
+  a.href=dataUrl;a.download=fileName;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+
+async function renderCircularAdminList(){
+  const circulars=await idbGetAll('circulars');
+  const el=document.getElementById('circularAdminList');if(!el)return;
+  if(!circulars.length){el.innerHTML='<div class="warn-note">No circulars published yet.</div>';return;}
+  // Sort newest first
+  circulars.sort((a,b)=>new Date(b.publishedAt)-new Date(a.publishedAt));
+  el.innerHTML=circulars.map(c=>{
+    const date=new Date(c.publishedAt).toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'});
+    const icon=circularFileIcon(c.fileType);
+    return`<div style="display:flex;align-items:flex-start;gap:14px;background:var(--soft);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:10px">
+      <div style="font-size:28px;flex-shrink:0">${icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;color:var(--navy);font-size:14px">${c.title}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:5px">
+          <span class="badge badge-navy">${circularTermLabel(c.term)}</span>
+          <span style="font-size:12px;color:var(--muted)">📅 ${date}</span>
+          <span style="font-size:12px;color:var(--muted)">🎓 ${c.year}</span>
+        </div>
+        ${c.notes?`<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5">${c.notes}</div>`:''}
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">📎 ${c.fileName}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+        <button class="btn btn-outline btn-xs" onclick="openCircularFile('${c.fileData.replace(/'/g,'\\\'').substring(0,0)}'+circulars_cache[${c.id}],'${c.fileName}','${c.fileType}')">👁 View</button>
+        <button class="btn btn-green btn-xs" onclick="downloadCircularFile('${c.fileData.replace(/'/g,'\\\'').substring(0,0)}'+circulars_cache[${c.id}],'${c.fileName}')">⬇️ Download</button>
+        <button class="btn btn-danger btn-xs" onclick="deleteCircular(${c.id})">🗑 Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+  // Store file data in a cache object so inline onclick can access it without huge inline strings
+  window.circulars_cache=Object.fromEntries(circulars.map(c=>[c.id,c.fileData]));
+  // Re-render with proper onclick using the cache
+  el.innerHTML=circulars.map(c=>{
+    const date=new Date(c.publishedAt).toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'});
+    const icon=circularFileIcon(c.fileType);
+    return`<div style="display:flex;align-items:flex-start;gap:14px;background:var(--soft);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:10px">
+      <div style="font-size:28px;flex-shrink:0">${icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;color:var(--navy);font-size:14px">${c.title}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:5px">
+          <span class="badge badge-navy">${circularTermLabel(c.term)}</span>
+          <span style="font-size:12px;color:var(--muted)">📅 ${date}</span>
+          <span style="font-size:12px;color:var(--muted)">🎓 ${c.year}</span>
+        </div>
+        ${c.notes?`<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5">${c.notes}</div>`:''}
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">📎 ${c.fileName}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+        <button class="btn btn-outline btn-xs" onclick="openCircularFile(circulars_cache[${c.id}],'${c.fileName.replace(/'/g,"\\'")}','${c.fileType}')">👁 View</button>
+        <button class="btn btn-green btn-xs" onclick="downloadCircularFile(circulars_cache[${c.id}],'${c.fileName.replace(/'/g,"\\'")}')">⬇️ Download</button>
+        <button class="btn btn-danger btn-xs" onclick="deleteCircular(${c.id})">🗑 Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function renderCircularReadList(containerId){
+  const el=document.getElementById(containerId);if(!el)return;
+  const circulars=await idbGetAll('circulars');
+  if(!circulars.length){el.innerHTML='<div class="warn-note">No circulars have been published yet. Check back after each term.</div>';return;}
+  circulars.sort((a,b)=>new Date(b.publishedAt)-new Date(a.publishedAt));
+  window.circulars_cache=Object.fromEntries(circulars.map(c=>[c.id,c.fileData]));
+  el.innerHTML=circulars.map(c=>{
+    const date=new Date(c.publishedAt).toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'});
+    const icon=circularFileIcon(c.fileType);
+    return`<div style="display:flex;align-items:flex-start;gap:14px;background:var(--soft);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:10px">
+      <div style="font-size:32px;flex-shrink:0">${icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;color:var(--navy);font-size:14px">${c.title}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:5px">
+          <span class="badge badge-navy">${circularTermLabel(c.term)}</span>
+          <span style="font-size:12px;color:var(--muted)">📅 ${date}</span>
+          <span style="font-size:12px;color:var(--muted)">🎓 ${c.year}</span>
+        </div>
+        ${c.notes?`<div style="margin-top:7px;font-size:13px;color:var(--text);background:#fff;border-left:4px solid var(--gold);border-radius:0 7px 7px 0;padding:8px 12px;line-height:1.6">${c.notes}</div>`:''}
+        <div style="font-size:11px;color:var(--muted);margin-top:5px">📎 ${c.fileName}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+        <button class="btn btn-primary btn-sm" onclick="openCircularFile(circulars_cache[${c.id}],'${c.fileName.replace(/'/g,"\\'")}','${c.fileType}')">👁 View</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadCircularFile(circulars_cache[${c.id}],'${c.fileName.replace(/'/g,"\\'")}')">⬇️ Download</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ════════ PWA INSTALL ════════ */
+let _pwaInstallEvent=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();_pwaInstallEvent=e;
+  const btn=document.getElementById('installBtn');if(btn)btn.style.display='inline-block';
+});
+window.addEventListener('appinstalled',()=>{
+  _pwaInstallEvent=null;
+  const btn=document.getElementById('installBtn');if(btn)btn.style.display='none';
+});
+async function installPWA(){
+  if(!_pwaInstallEvent){
+    alert('To install:\n\n📱 Android: tap the 3-dot menu → "Add to Home screen"\n🍎 iPhone: tap Share → "Add to Home Screen"');return;
+  }
+  _pwaInstallEvent.prompt();
+  const{outcome}=await _pwaInstallEvent.userChoice;
+  if(outcome==='accepted')_pwaInstallEvent=null;
+}
+
+/* ════════ BOOT ════════ */
+// ── Boot: Firebase is already initialised above; just hide the loading overlay ──
+(async () => {
+  try {
+    // Verify Firestore is reachable by reading school config
+    await _getSchoolDoc();
+    document.getElementById('dbOverlay').style.display = 'none';
+    const hasHash = await idbGet('school', 'adminPwHash').catch(() => null);
+    if (hasHash) document.getElementById('defaultPwHint').style.display = 'none';
+  } catch(err) {
+    document.getElementById('dbOverlay').querySelector('p').textContent =
+      'Firebase connection error: ' + err.message + '. Check your config and try again.';
+  }
+})();
+
+// Expose needed functions to inline onclick handlers (required for module scripts)
+Object.assign(window, {
+  loginAdmin, logoutAdmin, switchPage, switchAdminTab, switchTeacherTab,
+  saveSchoolInfo, saveAdminPassword, addClass, deleteClass,
+  addSubject, deleteSubject, renderSubjectCombo, enforceElectiveLimit,
+  saveStudent, openEditStudent, saveEditStudent, deleteStudent, bulkImportStudents,
+  saveNewTeacher, deleteTeacher, openEditTeacher, saveEditTeacher,
+  saveNewParent, deleteParent, openEditParent, saveEditParent,
+  teacherLogin, logoutTeacher, teacherChangeClass, teacherChangeTerm,
+  teacherChangeYear, saveMarks, exportMarksExcel,
+  loadReportStudents, generateReport, downloadReportPDF, printAllReportCards,
+  populateClassFilters, switchReportTab,
+  parentLogin, logoutParent,
+  publishCircular, deleteCircular, openCircularFile, downloadCircularFile,
+  clearAll, previewImage, closeModal, openModal,
+  renderSubjectManager, addSubject, deleteSubject,
+  renderClassManager,
+});
+
+</script>
+</body>
+</html>
